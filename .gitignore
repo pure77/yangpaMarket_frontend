@@ -1,0 +1,22 @@
+node_modules/
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Secrets / key materials
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

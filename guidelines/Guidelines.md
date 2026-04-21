@@ -1,0 +1,1 @@
+Design style: clean minimal Korean app UI, similar to Karrot Market (당근마켓). Use white background, light gray surfaces (#F5F5F5), coral/orange primary accent (#FF6F0F), neutral gray text (#1A1A1A, #888). Font: Pretendard or Inter. Border radius: 12px for cards, 8px for inputs/buttons. No shadows except subtle card elevation. Mobile-first, 390px width. All text in Korean.
