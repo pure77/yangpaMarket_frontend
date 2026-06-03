@@ -6,7 +6,6 @@ import type {
   PaymentOrderSummary,
   PaymentRecord,
   PlaceBidInput,
-  UserProfile,
 } from "../domain/types";
 import { getAppState, setAppState } from "../state/appStore";
 import type { AuthRepository, AuctionRepository, PaymentRepository } from "./contracts";
@@ -19,6 +18,7 @@ function nowIso(): string {
 }
 
 function nextId(prefix: "auction" | "bid" | "payment" | "user"): string {
+  // 단순 카운터 기반 ID 발급: mock 환경에서 충돌 없이 식별자 생성용입니다.
   const state = getAppState();
   const value = state.counters[prefix];
 
@@ -39,6 +39,7 @@ function getAuctionOrNull(auctionId: string): Auction | null {
 }
 
 function maskBidderName(nickname: string): string {
+  // 입찰 내역 노출 시 개인정보 보호를 위해 닉네임을 마스킹합니다.
   if (!nickname) {
     return "게스트";
   }
@@ -47,6 +48,7 @@ function maskBidderName(nickname: string): string {
 
 const auctionRepository: AuctionRepository = {
   async listAuctions() {
+    // 홈 화면에서 마감 임박순으로 보이도록 정렬해 반환합니다.
     return [...getAppState().auctions].sort((a, b) => {
       return new Date(a.endAt).getTime() - new Date(b.endAt).getTime();
     });
@@ -92,15 +94,16 @@ const auctionRepository: AuctionRepository = {
     return created;
   },
 
-  async placeBid(input) {
+  async placeBid(input: PlaceBidInput) {
     const auction = getAuctionOrNull(input.auctionId);
     if (!auction) {
       throw new Error("해당 경매를 찾을 수 없습니다.");
     }
     if (auction.isSold) {
-      throw new Error("이미 결제 완료된 경매입니다.");
+      throw new Error("이미 결제가 완료된 경매입니다.");
     }
 
+    // 최소 입찰 단위(BID_STEP)를 강제해 현재가보다 낮은 금액을 자동 보정합니다.
     const amount = Math.max(input.amount, auction.currentBid + BID_STEP);
     const bid: Bid = {
       id: nextId("bid"),
@@ -128,6 +131,7 @@ const auctionRepository: AuctionRepository = {
 
       return {
         ...prev,
+        // 최신 입찰이 상단에 보이도록 배열 앞에 추가합니다.
         auctions: nextAuctions,
         bids: [bid, ...prev.bids],
       };
@@ -169,6 +173,7 @@ const auctionRepository: AuctionRepository = {
         if (item.id !== auctionId) {
           return item;
         }
+        // 결제 완료 시 낙찰자 정보를 확정하고 재결제를 막기 위해 isSold를 true로 변경합니다.
         updatedAuction = {
           ...item,
           isSold: true,
@@ -184,67 +189,62 @@ const auctionRepository: AuctionRepository = {
 };
 
 const authRepository: AuthRepository = {
-  async getSession() {
-    return getAppState().session;
-  },
-
-  async login(email) {
-    const state = getAppState();
-    let user = state.users.find((item) => item.email === email) ?? null;
-
-    if (!user) {
-      const nickname = email.split("@")[0] || "사용자";
-      user = {
-        id: nextId("user"),
-        nickname,
-        email,
-        phone: "",
-      };
-
-      setAppState((prev) => ({
-        ...prev,
-        users: [...prev.users, user!],
-      }));
-    }
-
-    const session = { isAuthenticated: true, user };
-    setAppState((prev) => ({
-      ...prev,
-      session,
-    }));
-    return session;
-  },
-
-  async signup(input) {
-    const state = getAppState();
-    const existing = state.users.find((item) => item.email === input.email);
-    if (existing) {
-      const session = { isAuthenticated: true, user: existing };
-      setAppState((prev) => ({ ...prev, session }));
-      return session;
-    }
-
-    const created: UserProfile = {
-      id: nextId("user"),
-      nickname: input.nickname || "사용자",
-      email: input.email,
-      phone: input.phone,
+  async getKakaoLoginUrl() {
+    return {
+      authorizeUrl: "/auth/kakao/callback?code=mock-code&state=mock-state",
+      state: "mock-state",
     };
+  },
 
-    const session = { isAuthenticated: true, user: created };
-    setAppState((prev) => ({
-      ...prev,
-      users: [...prev.users, created],
-      session,
-    }));
-    return session;
+  async completeKakaoCallback() {
+    throw new Error("Mock auth repository에서는 카카오 콜백을 지원하지 않습니다.");
+  },
+
+  async completeSignup() {
+    throw new Error("Mock auth repository에서는 회원가입 완료를 지원하지 않습니다.");
+  },
+
+  async refresh() {
+    throw new Error("Mock auth repository에서는 토큰 갱신을 지원하지 않습니다.");
   },
 
   async logout() {
     setAppState((prev) => ({
       ...prev,
-      session: { isAuthenticated: false, user: null },
+      session: {
+        ...prev.session,
+        isAuthenticated: false,
+        user: null,
+        accessToken: null,
+        authStatus: "anonymous",
+        pendingSignup: null,
+        authNotice: null,
+      },
     }));
+  },
+
+  async getMe() {
+    const currentUser = getAppState().session.user;
+    if (!currentUser) {
+      throw new Error("로그인이 필요합니다.");
+    }
+    return currentUser;
+  },
+
+  async restoreSession() {
+    setAppState((prev) => ({
+      ...prev,
+      session: {
+        ...prev.session,
+        isAuthenticated: false,
+        user: null,
+        accessToken: null,
+        authStatus: "anonymous",
+        pendingSignup: null,
+        authNotice: null,
+      },
+    }));
+    return getAppState().session;
   },
 };
 
@@ -255,6 +255,7 @@ const paymentRepository: PaymentRepository = {
       return null;
     }
     const amount = auction.currentBid;
+    // 수수료는 고정 비율(FEE_RATE) 정책을 사용합니다.
     const fee = Math.round(amount * FEE_RATE);
     return {
       auction,
@@ -290,6 +291,7 @@ const paymentRepository: PaymentRepository = {
 
     setAppState((prev) => ({
       ...prev,
+      // 결제 이력 최신순 정렬을 위해 앞에 삽입합니다.
       payments: [payment, ...prev.payments],
     }));
 

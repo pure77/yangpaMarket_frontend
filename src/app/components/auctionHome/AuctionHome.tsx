@@ -17,6 +17,7 @@ export function AuctionHome() {
   const [query, setQuery] = useState("");
 
   const filteredAuctions = useMemo(() => {
+    // 카테고리 + 검색어를 동시에 적용해 홈 카드 목록을 만듭니다.
     return auctions.filter((item) => {
       const byCategory = activeCategory === "전체" || item.category === activeCategory;
       const normalizedQuery = query.trim().toLowerCase();
@@ -30,6 +31,7 @@ export function AuctionHome() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      {/* 상단 고정 헤더: 알림/마이페이지 진입점 */}
       <div className="sticky top-0 bg-white border-b border-[#E8E8E8] z-10">
         <div className="max-w-[390px] mx-auto px-4 h-14 flex items-center justify-between">
           <h1 className="text-[18px] font-semibold text-[#1A1A1A]">경매마켓</h1>
@@ -95,6 +97,7 @@ export function AuctionHome() {
 
           <div className="grid grid-cols-2 gap-3 pb-6">
             {filteredAuctions.map((item) => {
+              // 카드마다 남은 시간을 계산해 긴급도 색상을 다르게 보여줍니다.
               const remainingMinutes = getRemainingMinutes(item.endAt);
               return (
                 <button

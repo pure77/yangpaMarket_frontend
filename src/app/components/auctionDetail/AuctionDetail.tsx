@@ -23,6 +23,7 @@ export function AuctionDetail() {
   const images = auction?.images ?? [];
 
   useEffect(() => {
+    // 1초마다 tick을 갱신해 남은 시간 UI를 실시간으로 다시 계산합니다.
     const timer = window.setInterval(() => {
       setTick((prev) => prev + 1);
     }, 1000);
@@ -36,6 +37,7 @@ export function AuctionDetail() {
     return Math.max(0, Math.floor((new Date(auction.endAt).getTime() - Date.now()) / 1000));
   }, [auction, tick]);
 
+  // 잘못된 ID 접근 시 목록으로 돌아갈 수 있게 안내 화면을 보여줍니다.
   if (!auction) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
@@ -53,6 +55,7 @@ export function AuctionDetail() {
   }
 
   const handleBid = async () => {
+    // 비로그인 사용자는 인증 화면으로 유도합니다.
     if (!isAuthenticated) {
       navigate("/auth");
       return;
@@ -61,8 +64,10 @@ export function AuctionDetail() {
     setIsBidding(true);
     setErrorMessage("");
     try {
+      // 현재 정책: 추천 다음 입찰가로 즉시 입찰 요청
       const nextBid = getSuggestedNextBid(auction.id);
       const result = await placeBid(auction.id, nextBid);
+      // 즉시구매가 이상이 되면 결제 화면으로 연결합니다.
       if (result.auction.buyNowPrice && result.auction.currentBid >= result.auction.buyNowPrice) {
         navigate(`/payment/${result.auction.id}`);
       }
@@ -77,6 +82,7 @@ export function AuctionDetail() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      {/* 상품 이미지/설명/입찰내역은 스크롤 영역에, 입찰 버튼은 하단 고정으로 배치합니다. */}
       <div className="sticky top-0 bg-white z-20 border-b border-[#E8E8E8]">
         <div className="max-w-[390px] mx-auto px-4 h-14 flex items-center justify-between">
           <button onClick={() => navigate(-1)} className="p-1">

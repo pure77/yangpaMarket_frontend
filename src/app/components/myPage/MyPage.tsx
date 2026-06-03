@@ -10,10 +10,12 @@ export function MyPage() {
   const { auctions, bids } = useAuctions();
   const currentUserId = user?.id ?? '';
 
+  // 같은 경매에 여러 번 입찰했어도 1건으로 계산하기 위해 Set을 사용합니다.
   const interestCount = new Set(
     bids.filter((item) => item.bidderId === currentUserId).map((item) => item.auctionId),
   ).size;
 
+  // 상단 요약 카드 데이터(판매중/낙찰/관심)를 화면에서 바로 계산합니다.
   const activityStats = [
     {
       label: '진행중인 경매',
@@ -174,8 +176,12 @@ export function MyPage() {
               <button
                 onClick={() => {
                   void (async () => {
-                    await logout();
-                    navigate('/auth');
+                    try {
+                      // 로그아웃 시 세션/토큰 정리 후 홈으로 이동합니다.
+                      await logout();
+                    } finally {
+                      navigate('/auctions', { replace: true });
+                    }
                   })();
                 }}
                 className="w-full px-4 h-14 flex items-center hover:bg-[#F5F5F5] transition-colors"

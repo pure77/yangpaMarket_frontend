@@ -5,26 +5,33 @@ function minutesFromNow(minutes: number): string {
 }
 
 export function createInitialAppState(): AppState {
+  // 앱 첫 실행 시 사용할 기본 로그인 사용자(데모용)입니다.
   const defaultUser = {
     id: "user-1",
     nickname: "김민수",
     email: "kimminsu@email.com",
-    phone: "01012341234",
+    phone: "010-1234-1234",
   };
 
   return {
     users: [defaultUser],
+    // 세션은 초기에는 비로그인 상태로 시작하고 App.tsx에서 restoreSession으로 복구를 시도합니다.
     session: {
       isAuthenticated: false,
       user: null,
+      accessToken: null,
+      authStatus: "idle",
+      pendingSignup: null,
+      authNotice: null,
     },
+    // 홈/상세/입찰 플로우를 바로 확인할 수 있도록 샘플 경매 데이터를 함께 올립니다.
     auctions: [
       {
         id: "auction-1",
-        title: "아이폰 15 Pro 256GB 블루티타늄",
+        title: "아이폰 15 Pro 256GB 블루",
         category: "전자기기",
         description:
-          "구매 2개월, 사용감 거의 없는 상태입니다. 박스/케이블 구성품 포함, 애플케어 잔여.",
+          "구매 2개월, 사용감 거의 없습니다. 박스/케이블 포함이며 배터리 상태 양호합니다.",
         images: [
           "https://images.unsplash.com/photo-1758186355698-bd0183fc75ed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
           "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
@@ -38,16 +45,16 @@ export function createInitialAppState(): AppState {
         endAt: minutesFromNow(45),
         createdAt: new Date().toISOString(),
         sellerId: "user-2",
-        sellerName: "김민수",
+        sellerName: "김지원",
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-3",
       },
       {
         id: "auction-2",
-        title: "나이키 에어조던 1 레트로 하이",
+        title: "헤이즈 오프화이트 니트",
         category: "패션",
-        description: "정품, 박스 포함. 실착 3회.",
+        description: "정품, 박스 포함. 착용 3회.",
         images: [
           "https://images.unsplash.com/photo-1695459468644-717c8ae17eed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
         ],
@@ -59,7 +66,7 @@ export function createInitialAppState(): AppState {
         endAt: minutesFromNow(120),
         createdAt: new Date().toISOString(),
         sellerId: "user-4",
-        sellerName: "이서연",
+        sellerName: "이서윤",
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-5",
@@ -80,16 +87,16 @@ export function createInitialAppState(): AppState {
         endAt: minutesFromNow(240),
         createdAt: new Date().toISOString(),
         sellerId: "user-6",
-        sellerName: "박지훈",
+        sellerName: "박지우",
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-1",
       },
       {
         id: "auction-4",
-        title: "로렉스 서브마리너 시계",
+        title: "롤렉스 서브마리너 시계",
         category: "수집품",
-        description: "보증서 포함, 점검 완료.",
+        description: "보증서 포함, 폴리싱 완료.",
         images: [
           "https://images.unsplash.com/photo-1639564879163-a2a85682410e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
         ],
@@ -108,7 +115,7 @@ export function createInitialAppState(): AppState {
       },
       {
         id: "auction-5",
-        title: "샤넬 클래식 플랩백 미디엄",
+        title: "샤넬 클래식 플랩 미디엄",
         category: "패션",
         description: "백화점 구매 정품, 더스트백 포함.",
         images: [
@@ -149,6 +156,7 @@ export function createInitialAppState(): AppState {
         highestBidderId: "user-11",
       },
     ],
+    // 입찰 내역 샘플 데이터: 상세 화면의 입찰 히스토리 UI를 위해 사용됩니다.
     bids: [
       {
         id: "bid-1",
@@ -192,6 +200,7 @@ export function createInitialAppState(): AppState {
       },
     ],
     payments: [],
+    // 간단한 문자열 ID 생성을 위한 카운터입니다. (mockRepository의 nextId에서 사용)
     counters: {
       auction: 7,
       bid: 6,

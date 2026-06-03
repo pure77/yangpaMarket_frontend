@@ -34,6 +34,7 @@ export function Payment() {
   });
 
   useEffect(() => {
+    // URL의 auctionId 기준으로 결제 요약(낙찰가/수수료/총액)을 불러옵니다.
     void (async () => {
       const summary = await getOrderSummary(auctionId);
       setOrderSummary(summary);
@@ -85,6 +86,7 @@ export function Payment() {
   ];
 
   const handlePayment = async () => {
+    // 결제 전 필수 조건(주문 존재/로그인/약관 동의)을 순서대로 확인합니다.
     if (!orderSummary) {
       setErrorMessage("결제 정보를 불러오지 못했습니다.");
       return;
@@ -106,6 +108,7 @@ export function Payment() {
         setErrorMessage("결제 처리 중 문제가 발생했습니다.");
         return;
       }
+      // 성공 시 별도 라우팅 대신 성공 화면을 같은 컴포넌트에서 전환 렌더링합니다.
       setShowSuccess(true);
     } finally {
       setIsSubmitting(false);
@@ -114,9 +117,11 @@ export function Payment() {
 
   const handleMethodSelect = (method: PaymentMethod) => {
     setSelectedMethod(method);
+    // 카드 선택 시에만 카드 입력 폼을 노출합니다.
     setShowCardDetails(method === "card");
   };
 
+  // 주문 정보가 없으면 결제 진입 실패 상태를 안내합니다.
   if (!orderSummary) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">

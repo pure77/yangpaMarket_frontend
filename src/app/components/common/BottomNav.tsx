@@ -8,6 +8,7 @@ interface BottomNavProps {
 }
 
 function getTabByPathname(pathname: string): NavTab {
+  // 현재 URL로 하단 탭 활성 상태를 계산합니다.
   if (pathname.startsWith("/mypage/my-bids")) {
     return "wishlist";
   }
@@ -26,6 +27,7 @@ export function BottomNav({ activeTab }: BottomNavProps) {
   const current = activeTab ?? getTabByPathname(pathname);
 
   const handleMove = (path: string) => {
+    // 탭 클릭 시 단순 라우팅 이동만 담당합니다.
     navigate(path);
   };
 

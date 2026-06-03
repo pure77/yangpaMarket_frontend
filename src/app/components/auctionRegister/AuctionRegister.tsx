@@ -38,7 +38,7 @@ export function AuctionRegister() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      // Mock image upload - in real app would upload to server
+      // 현재는 mock 단계라 서버 업로드 대신 로컬 미리보기 URL을 생성합니다.
       const newImages = Array.from(files).map((file) => URL.createObjectURL(file));
       setUploadedImages((prev) => [...prev, ...newImages].slice(0, 10));
     }
@@ -49,6 +49,7 @@ export function AuctionRegister() {
   };
 
   const handleNext = async () => {
+    // Step 1: 기본 정보 검증
     if (currentStep === 1) {
       if (!formData.title || !formData.category || !formData.description) {
         setErrorMessage('기본 정보를 모두 입력해주세요.');
@@ -59,6 +60,7 @@ export function AuctionRegister() {
       return;
     }
 
+    // Step 2: 가격/마감 검증
     if (currentStep === 2) {
       if (!formData.startPrice || !formData.endDateTime) {
         setErrorMessage('가격과 마감 시간을 입력해주세요.');
@@ -73,6 +75,7 @@ export function AuctionRegister() {
       return;
     }
 
+    // Step 3: 최종 등록 전 로그인 여부 확인
     if (!isAuthenticated) {
       navigate('/auth');
       return;
@@ -81,6 +84,7 @@ export function AuctionRegister() {
     setErrorMessage('');
     setIsSubmitting(true);
     try {
+      // 검증된 폼 데이터를 repository 규격에 맞춰 등록합니다.
       const created = await createAuction({
         title: formData.title,
         category: formData.category,

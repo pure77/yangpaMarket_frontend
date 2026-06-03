@@ -3,10 +3,14 @@ import { AuctionDetail } from "./components/auctionDetail/AuctionDetail";
 import { AuctionHome } from "./components/auctionHome/AuctionHome";
 import { AuctionRegister } from "./components/auctionRegister/AuctionRegister";
 import { PlaceholderPage } from "./components/common/PlaceholderPage";
+import { RequireAuth } from "./components/common/RequireAuth";
 import { AuthScreen } from "./components/login/AuthScreen";
+import { KakaoCallbackScreen } from "./components/login/KakaoCallbackScreen";
+import { SignupCompleteScreen } from "./components/login/SignupCompleteScreen";
 import { MyPage } from "./components/myPage/MyPage";
 import { Payment } from "./components/payment/Payment";
 
+// 아래 Placeholder 페이지들은 실제 기능 구현 전까지 동선을 끊지 않기 위한 임시 화면입니다.
 function MyAuctionsPage() {
   return (
     <PlaceholderPage
@@ -79,6 +83,98 @@ function SupportPage() {
   );
 }
 
+function ProtectedAuctionRegister() {
+  return (
+    <RequireAuth>
+      <AuctionRegister />
+    </RequireAuth>
+  );
+}
+
+function ProtectedMyPage() {
+  return (
+    <RequireAuth>
+      <MyPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedMyAuctionsPage() {
+  return (
+    <RequireAuth>
+      <MyAuctionsPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedMyBidsPage() {
+  return (
+    <RequireAuth>
+      <MyBidsPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedMyWinsPage() {
+  return (
+    <RequireAuth>
+      <MyWinsPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedMySalesPage() {
+  return (
+    <RequireAuth>
+      <MySalesPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedPaymentHistoryPage() {
+  return (
+    <RequireAuth>
+      <PaymentHistoryPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedSettlementHistoryPage() {
+  return (
+    <RequireAuth>
+      <SettlementHistoryPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedNotificationsPage() {
+  return (
+    <RequireAuth>
+      <NotificationsPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedSupportPage() {
+  return (
+    <RequireAuth>
+      <SupportPage />
+    </RequireAuth>
+  );
+}
+
+function ProtectedPayment() {
+  return (
+    <RequireAuth>
+      <Payment />
+    </RequireAuth>
+  );
+}
+
+// 라우팅 규칙:
+// 1) 공개 페이지(경매 목록/상세, 인증)
+// 2) 보호 페이지(등록, 마이페이지, 결제) - RequireAuth로 감쌈
+// 3) 과거 경로/오타 경로는 redirect로 정리
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -94,51 +190,59 @@ export const router = createBrowserRouter([
   },
   {
     path: "/auctions/new",
-    Component: AuctionRegister,
+    Component: ProtectedAuctionRegister,
   },
   {
     path: "/auth",
     Component: AuthScreen,
   },
   {
+    path: "/auth/kakao/callback",
+    Component: KakaoCallbackScreen,
+  },
+  {
+    path: "/auth/signup/complete",
+    Component: SignupCompleteScreen,
+  },
+  {
     path: "/mypage",
-    Component: MyPage,
+    Component: ProtectedMyPage,
   },
   {
     path: "/mypage/my-auctions",
-    Component: MyAuctionsPage,
+    Component: ProtectedMyAuctionsPage,
   },
   {
     path: "/mypage/my-bids",
-    Component: MyBidsPage,
+    Component: ProtectedMyBidsPage,
   },
   {
     path: "/mypage/my-wins",
-    Component: MyWinsPage,
+    Component: ProtectedMyWinsPage,
   },
   {
     path: "/mypage/my-sales",
-    Component: MySalesPage,
+    Component: ProtectedMySalesPage,
   },
   {
     path: "/mypage/payment-history",
-    Component: PaymentHistoryPage,
+    Component: ProtectedPaymentHistoryPage,
   },
   {
     path: "/mypage/settlement-history",
-    Component: SettlementHistoryPage,
+    Component: ProtectedSettlementHistoryPage,
   },
   {
     path: "/mypage/notifications",
-    Component: NotificationsPage,
+    Component: ProtectedNotificationsPage,
   },
   {
     path: "/mypage/support",
-    Component: SupportPage,
+    Component: ProtectedSupportPage,
   },
   {
     path: "/payment/:auctionId",
-    Component: Payment,
+    Component: ProtectedPayment,
   },
   {
     path: "/payment",

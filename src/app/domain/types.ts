@@ -1,5 +1,9 @@
 export type PaymentMethod = "kakaopay" | "tosspay" | "card" | "bank";
+export type AuthStatus = "idle" | "bootstrapping" | "authenticated" | "anonymous";
+export type AuthNotice = "SESSION_EXPIRED" | "LOGIN_REQUIRED" | null;
+export type AgreementTermCode = "TERMS_OF_SERVICE" | "PRIVACY_POLICY" | "MARKETING";
 
+// 인증/사용자
 export interface UserProfile {
   id: string;
   nickname: string;
@@ -7,11 +11,60 @@ export interface UserProfile {
   phone: string;
 }
 
+export interface PendingSignup {
+  signupToken: string;
+  email: string | null;
+  nickname: string | null;
+}
+
 export interface AuthSession {
   isAuthenticated: boolean;
   user: UserProfile | null;
+  accessToken: string | null;
+  authStatus: AuthStatus;
+  pendingSignup: PendingSignup | null;
+  authNotice: AuthNotice;
 }
 
+export interface Agreement {
+  termCode: AgreementTermCode;
+  isRequired: boolean;
+  agreed: boolean;
+}
+
+export interface TokenBundle {
+  userId: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number | null;
+}
+
+export interface KakaoCallbackResult {
+  requiresProfileSetup: boolean;
+  signupToken: string | null;
+  userId: string | null;
+  email: string | null;
+  nickname: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  expiresIn: number | null;
+}
+
+export interface CompleteKakaoCallbackInput {
+  code: string;
+  state: string;
+  redirectUri: string;
+}
+
+export interface CompleteSignupInput {
+  signupToken: string;
+  nickname: string;
+  phone: string;
+  marketingOptIn: boolean;
+  agreements: Agreement[];
+}
+
+// 경매/입찰
 export interface Auction {
   id: string;
   title: string;
@@ -79,12 +132,14 @@ export interface PlaceBidInput {
   bidderName: string;
 }
 
+// 결제
 export interface CompletePaymentInput {
   auctionId: string;
   buyerId: string;
   method: PaymentMethod;
 }
 
+// 앱 전역 상태
 export interface AppState {
   users: UserProfile[];
   session: AuthSession;
@@ -98,3 +153,4 @@ export interface AppState {
     user: number;
   };
 }
+
