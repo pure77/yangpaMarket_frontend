@@ -5,18 +5,39 @@ import { useAuth } from "../../hooks/useAuth";
 import { getRemainingMinutes, useAuctions } from "../../hooks/useAuctions";
 import { formatPrice, formatTimeAgo, formatTimeLeftSeconds } from "../../utils/format";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 
 export function AuctionDetail() {
   const { auctionId = "" } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { getAuctionById, getAuctionBids, getSuggestedNextBid, placeBid } = useAuctions();
+  const {
+    getAuctionById,
+    getAuctionBids,
+    getSuggestedNextBid,
+    placeBid,
+    ensureAuctionLoaded,
+    isAuctionLive,
+    canManageAuction,
+    deleteAuction,
+  } = useAuctions();
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isBidding, setIsBidding] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [tick, setTick] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const auction = getAuctionById(auctionId);
   const bidHistory = getAuctionBids(auctionId);
@@ -29,6 +50,10 @@ export function AuctionDetail() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    void ensureAuctionLoaded(auctionId);
+  }, [auctionId]);
 
   const remainingSeconds = useMemo(() => {
     if (!auction) {
@@ -61,6 +86,11 @@ export function AuctionDetail() {
       return;
     }
 
+    if (!isAuctionLive(auction)) {
+      setErrorMessage("아직 공개되지 않은 경매입니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
     setIsBidding(true);
     setErrorMessage("");
     try {
@@ -88,9 +118,27 @@ export function AuctionDetail() {
           <button onClick={() => navigate(-1)} className="p-1">
             <ArrowLeft className="w-6 h-6 text-[#1A1A1A]" />
           </button>
-          <button className="p-1">
-            <Share2 className="w-6 h-6 text-[#1A1A1A]" />
-          </button>
+          <div className="flex items-center gap-2">
+            {canManageAuction(auction) && (
+              <>
+                <button
+                  onClick={() => navigate(`/auctions/${auction.id}/edit`)}
+                  className="text-[14px] font-medium text-[#1A1A1A] px-2"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-[14px] font-medium text-[#FF3B30] px-2"
+                >
+                  삭제
+                </button>
+              </>
+            )}
+            <button className="p-1">
+              <Share2 className="w-6 h-6 text-[#1A1A1A]" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -227,16 +275,47 @@ export function AuctionDetail() {
               </button>
               <button
                 onClick={handleBid}
-                disabled={isBidding || auction.isSold}
+                disabled={isBidding || auction.isSold || !isAuctionLive(auction)}
                 className="h-12 px-6 bg-[#FF6F0F] text-white rounded-[8px] font-bold text-[16px] whitespace-nowrap hover:bg-[#FF6F0F]/90 transition-colors disabled:opacity-50"
               >
-                {auction.isSold ? "결제 완료" : "입찰하기"}
+                {auction.isSold ? "결제 완료" : !isAuctionLive(auction) ? "곧 공개" : "입찰하기"}
               </button>
             </div>
           </div>
           {errorMessage && <p className="text-[12px] text-[#FF3B30] mt-2">{errorMessage}</p>}
         </div>
       </div>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>경매를 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              입찰자가 없는 경매만 삭제할 수 있어요. 삭제하면 목록에서 사라집니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={async () => {
+                setIsDeleting(true);
+                try {
+                  await deleteAuction(auction.id);
+                  navigate("/mypage/my-auctions", { replace: true });
+                } catch (error) {
+                  setErrorMessage(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+                } finally {
+                  setIsDeleting(false);
+                  setShowDeleteConfirm(false);
+                }
+              }}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
