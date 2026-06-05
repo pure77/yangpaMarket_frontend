@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, X, Camera, ChevronDown } from 'lucide-react';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
-import { useNavigate } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { useAuctions } from '../../hooks/useAuctions';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -9,7 +9,9 @@ type ProductCondition = '미사용' | '거의새것' | '사용감있음';
 
 export function AuctionRegister() {
   const navigate = useNavigate();
-  const { createAuction } = useAuctions();
+  const { auctionId } = useParams();
+  const isEditMode = Boolean(auctionId);
+  const { createAuction, updateAuction, getAuctionById, ensureAuctionLoaded } = useAuctions();
   const { isAuthenticated } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
@@ -26,6 +28,29 @@ export function AuctionRegister() {
     buyNowPrice: '',
     endDateTime: '',
   });
+
+  useEffect(() => {
+    if (!auctionId) return;
+    void (async () => {
+      const loaded = (await ensureAuctionLoaded(auctionId)) ?? getAuctionById(auctionId);
+      if (!loaded) return;
+      setFormData({
+        title: loaded.title,
+        category: loaded.category,
+        description: loaded.description,
+        startPrice: String(loaded.startPrice),
+        buyNowPrice: loaded.buyNowPrice ? String(loaded.buyNowPrice) : '',
+        endDateTime: loaded.endAt ? loaded.endAt.slice(0, 16) : '',
+      });
+      if (loaded.condition) {
+        setProductCondition(loaded.condition as ProductCondition);
+      }
+      if (loaded.buyNowPrice) {
+        setEnableBuyNow(true);
+      }
+      setUploadedImages(loaded.images ?? []);
+    })();
+  }, [auctionId]);
 
   const categories = ['전자기기', '패션', '생활/가전', '수집품', '스포츠', '기타'];
 
@@ -84,8 +109,7 @@ export function AuctionRegister() {
     setErrorMessage('');
     setIsSubmitting(true);
     try {
-      // 검증된 폼 데이터를 repository 규격에 맞춰 등록합니다.
-      const created = await createAuction({
+      const payload = {
         title: formData.title,
         category: formData.category,
         description: formData.description,
@@ -94,8 +118,14 @@ export function AuctionRegister() {
         buyNowPrice: enableBuyNow && formData.buyNowPrice ? Number(formData.buyNowPrice) : null,
         endDateTime: formData.endDateTime,
         images: uploadedImages,
-      });
-      navigate(`/auctions/${created.id}`);
+      };
+      if (isEditMode && auctionId) {
+        await updateAuction(auctionId, payload);
+        navigate(`/auctions/${auctionId}`);
+      } else {
+        const created = await createAuction(payload);
+        navigate(`/auctions/${created.id}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -109,7 +139,7 @@ export function AuctionRegister() {
           <button onClick={() => navigate(-1)} className="absolute left-4 p-1">
             <ArrowLeft className="w-6 h-6 text-[#1A1A1A]" />
           </button>
-          <h1 className="text-[18px] font-semibold text-[#1A1A1A]">경매 등록</h1>
+          <h1 className="text-[18px] font-semibold text-[#1A1A1A]">{isEditMode ? '경매 수정' : '경매 등록'}</h1>
         </div>
       </div>
 
@@ -426,7 +456,7 @@ export function AuctionRegister() {
 
               <div className="bg-[#FFF4F0] border border-[#FF6F0F]/20 rounded-[12px] p-4">
                 <p className="text-[13px] text-[#FF6F0F] leading-relaxed">
-                  등록 후에는 수정이 불가능합니다. 입력하신 정보를 다시 한번 확인해주세요.
+                  입찰 전까지 수정 가능합니다. 등록 5분 뒤 공개되고 입찰이 시작됩니다.
                 </p>
               </div>
             </div>
@@ -445,7 +475,11 @@ export function AuctionRegister() {
             disabled={isSubmitting}
             className="w-full h-[52px] bg-[#FF6F0F] text-white rounded-[8px] font-bold text-[16px] hover:bg-[#FF6F0F]/90 transition-colors disabled:opacity-50"
           >
-            {currentStep === 3 ? (isSubmitting ? '등록 중...' : '등록하기') : '다음'}
+            {currentStep === 3
+              ? isSubmitting
+                ? isEditMode ? '수정 중...' : '등록 중...'
+                : isEditMode ? '수정하기' : '등록하기'
+              : '다음'}
           </button>
         </div>
       </div>
