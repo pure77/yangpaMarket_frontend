@@ -1,6 +1,6 @@
-import type { CreateAuctionInput } from "../domain/types";
+import type { Auction, CreateAuctionInput, UpdateAuctionInput } from "../domain/types";
 import { repositories } from "../repositories";
-import { useAppSelector } from "../state/appStore";
+import { getAppState, setAppState, useAppSelector } from "../state/appStore";
 
 const guestUser = {
   id: "guest-user",
@@ -33,8 +33,62 @@ export function useAuctions() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   };
 
+  const refreshAuctions = async () => {
+    const serverAuctions = await repositories.auction.listAuctions();
+    setAppState((prev) => ({ ...prev, auctions: serverAuctions }));
+    return serverAuctions;
+  };
+
+  const ensureAuctionLoaded = async (auctionId: string) => {
+    const existing = getAppState().auctions.find((item) => item.id === auctionId);
+    if (existing) return existing;
+    const fetched = await repositories.auction.getAuctionById(auctionId);
+    if (fetched) {
+      setAppState((prev) => ({
+        ...prev,
+        auctions: [fetched, ...prev.auctions.filter((item) => item.id !== fetched.id)],
+      }));
+    }
+    return fetched;
+  };
+
   const createAuction = async (input: CreateAuctionInput) => {
-    return repositories.auction.createAuction(input, currentUser);
+    const created = await repositories.auction.createAuction(input, currentUser);
+    setAppState((prev) => ({
+      ...prev,
+      auctions: [created, ...prev.auctions.filter((item) => item.id !== created.id)],
+    }));
+    return created;
+  };
+
+  const updateAuction = async (auctionId: string, input: UpdateAuctionInput) => {
+    const updated = await repositories.auction.updateAuction(auctionId, input);
+    setAppState((prev) => ({
+      ...prev,
+      auctions: prev.auctions.map((item) => (item.id === auctionId ? updated : item)),
+    }));
+    return updated;
+  };
+
+  const deleteAuction = async (auctionId: string) => {
+    await repositories.auction.deleteAuction(auctionId);
+    setAppState((prev) => ({
+      ...prev,
+      auctions: prev.auctions.filter((item) => item.id !== auctionId),
+    }));
+  };
+
+  const isAuctionLive = (auction: Auction) => {
+    return auction.status === "ACTIVE" && new Date(auction.startAt).getTime() <= Date.now();
+  };
+
+  const canManageAuction = (auction: Auction) => {
+    return (
+      !!sessionUser &&
+      auction.sellerId === sessionUser.id &&
+      auction.bidCount === 0 &&
+      auction.status === "ACTIVE"
+    );
   };
 
   const placeBid = async (auctionId: string, amount: number) => {
@@ -82,6 +136,12 @@ export function useAuctions() {
     getAuctionById,
     getAuctionBids,
     createAuction,
+    updateAuction,
+    deleteAuction,
+    refreshAuctions,
+    ensureAuctionLoaded,
+    isAuctionLive,
+    canManageAuction,
     placeBid,
     getSuggestedNextBid,
     listMySellingAuctions,
