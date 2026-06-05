@@ -11,6 +11,7 @@ import type {
   PaymentRecord,
   PlaceBidInput,
   TokenBundle,
+  UpdateAuctionInput,
   UserProfile,
 } from "../domain/types";
 
@@ -33,6 +34,8 @@ export interface AuctionRepository {
   getAuctionById(auctionId: string): Promise<Auction | null>;
   listAuctionBids(auctionId: string): Promise<Bid[]>;
   createAuction(input: CreateAuctionInput, seller: UserProfile): Promise<Auction>;
+  updateAuction(auctionId: string, input: UpdateAuctionInput): Promise<Auction>;
+  deleteAuction(auctionId: string): Promise<void>;
   placeBid(input: PlaceBidInput): Promise<{ auction: Auction; bid: Bid }>;
   listAuctionsBySeller(sellerId: string): Promise<Auction[]>;
   listBiddingAuctions(bidderId: string): Promise<Auction[]>;

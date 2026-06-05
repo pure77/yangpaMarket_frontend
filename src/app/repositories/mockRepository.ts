@@ -6,6 +6,7 @@ import type {
   PaymentOrderSummary,
   PaymentRecord,
   PlaceBidInput,
+  UpdateAuctionInput,
 } from "../domain/types";
 import { getAppState, setAppState } from "../state/appStore";
 import type { AuthRepository, AuctionRepository, PaymentRepository } from "./contracts";
@@ -94,6 +95,42 @@ const auctionRepository: AuctionRepository = {
     }));
 
     return created;
+  },
+
+  async updateAuction(auctionId: string, input: UpdateAuctionInput) {
+    let updated: Auction | null = null;
+    setAppState((prev) => ({
+      ...prev,
+      auctions: prev.auctions.map((item) => {
+        if (item.id !== auctionId) {
+          return item;
+        }
+        updated = {
+          ...item,
+          title: input.title,
+          category: input.category,
+          description: input.description,
+          condition: input.condition,
+          startPrice: input.startPrice,
+          currentBid: input.startPrice,
+          buyNowPrice: input.buyNowPrice,
+          endAt: input.endDateTime || item.endAt,
+          images: input.images.length > 0 ? input.images : item.images,
+        };
+        return updated;
+      }),
+    }));
+    if (!updated) {
+      throw new Error("해당 경매를 찾을 수 없습니다.");
+    }
+    return updated;
+  },
+
+  async deleteAuction(auctionId: string) {
+    setAppState((prev) => ({
+      ...prev,
+      auctions: prev.auctions.filter((item) => item.id !== auctionId),
+    }));
   },
 
   async placeBid(input: PlaceBidInput) {
