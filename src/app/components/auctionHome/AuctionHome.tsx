@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, Clock, Search, User } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuctions, getRemainingMinutes } from "../../hooks/useAuctions";
@@ -12,9 +12,13 @@ const categories: Category[] = ["전체", "전자기기", "패션", "생활/가�
 
 export function AuctionHome() {
   const navigate = useNavigate();
-  const { auctions } = useAuctions();
+  const { auctions, refreshAuctions, isAuctionLive } = useAuctions();
   const [activeCategory, setActiveCategory] = useState<Category>("전체");
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    void refreshAuctions();
+  }, []);
 
   const filteredAuctions = useMemo(() => {
     // 카테고리 + 검색어를 동시에 적용해 홈 카드 목록을 만듭니다.
@@ -25,9 +29,9 @@ export function AuctionHome() {
         normalizedQuery.length === 0 ||
         item.title.toLowerCase().includes(normalizedQuery) ||
         item.category.toLowerCase().includes(normalizedQuery);
-      return byCategory && byQuery;
+      return byCategory && byQuery && isAuctionLive(item);
     });
-  }, [activeCategory, auctions, query]);
+  }, [activeCategory, auctions, query, isAuctionLive]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
