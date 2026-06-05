@@ -1,15 +1,18 @@
 ﻿import type {
+  Auction,
   AuthNotice,
   AuthSession,
   CompleteKakaoCallbackInput,
   CompleteSignupInput,
+  CreateAuctionInput,
   KakaoCallbackResult,
   PendingSignup,
   TokenBundle,
+  UpdateAuctionInput,
   UserProfile,
 } from "../domain/types";
 import { getAppState, setAppState } from "../state/appStore";
-import type { ApiError as ApiErrorShape, ApiResponse, AuthRepository } from "./contracts";
+import type { ApiError as ApiErrorShape, ApiResponse, AuctionRepository, AuthRepository } from "./contracts";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 const REFRESH_TOKEN_KEY = "ym_refresh_token";
@@ -381,6 +384,176 @@ async function requestMe(
   return mapMeResponse(payload);
 }
 
+// --- 경매: 한글 라벨 ↔ 백엔드 ENUM 매핑 ---
+const CATEGORY_TO_ENUM: Record<string, string> = {
+  "전자기기": "ELECTRONICS",
+  "패션": "FASHION",
+  "생활/가전": "HOME_APPLIANCE",
+  "수집품": "COLLECTIBLE",
+  "스포츠": "SPORTS",
+  "기타": "ETC",
+};
+const ENUM_TO_CATEGORY: Record<string, string> = Object.fromEntries(
+  Object.entries(CATEGORY_TO_ENUM).map(([label, code]) => [code, label]),
+);
+const CONDITION_TO_ENUM: Record<string, string> = {
+  "미사용": "UNUSED",
+  "거의새것": "LIKE_NEW",
+  "사용감있음": "USED",
+};
+const ENUM_TO_CONDITION: Record<string, string> = Object.fromEntries(
+  Object.entries(CONDITION_TO_ENUM).map(([label, code]) => [code, label]),
+);
+
+function toCategoryEnum(label: string): string {
+  return CATEGORY_TO_ENUM[label] ?? "ETC";
+}
+function toConditionEnum(label: string): string {
+  return CONDITION_TO_ENUM[label] ?? "USED";
+}
+function fromCategoryEnum(code: string | undefined): string {
+  return code ? ENUM_TO_CATEGORY[code] ?? code : "";
+}
+function fromConditionEnum(code: string | undefined): string {
+  return code ? ENUM_TO_CONDITION[code] ?? code : "";
+}
+
+function toServerDateTime(value: string): string {
+  if (!value) return value;
+  return value.length === 16 ? `${value}:00` : value;
+}
+
+function normalizeAuction(payload: Record<string, unknown>): Auction {
+  const images = Array.isArray(payload.images)
+    ? (payload.images as string[])
+    : payload.thumbnailUrl
+      ? [payload.thumbnailUrl as string]
+      : [];
+  const seller = (payload.seller ?? {}) as Record<string, unknown>;
+  return {
+    id: String(payload.auctionId ?? ""),
+    title: String(payload.title ?? ""),
+    category: fromCategoryEnum(payload.category as string | undefined),
+    description: String(payload.description ?? ""),
+    images,
+    condition: fromConditionEnum(payload.condition as string | undefined),
+    startPrice: Number(payload.startPrice ?? payload.currentPrice ?? 0),
+    currentBid: Number(payload.currentPrice ?? 0),
+    bidCount: Number(payload.bidCount ?? 0),
+    buyNowPrice:
+      payload.buyNowPrice === null || payload.buyNowPrice === undefined
+        ? null
+        : Number(payload.buyNowPrice),
+    endAt: String(payload.endTime ?? ""),
+    createdAt: String(payload.createdAt ?? payload.startTime ?? new Date().toISOString()),
+    sellerId: seller.userId ? String(seller.userId) : "",
+    sellerName: seller.nickname ? String(seller.nickname) : "판매자",
+    isSold: String(payload.status ?? "") === "PAID",
+    winnerUserId: null,
+    highestBidderId: null,
+    status: String(payload.status ?? "ACTIVE"),
+    startAt: String(payload.startTime ?? payload.endTime ?? new Date().toISOString()),
+  };
+}
+
+async function resolveImageIds(images: string[]): Promise<string[]> {
+  const imageIds: string[] = [];
+  for (const image of images) {
+    // 이미 서버에 저장된 URL(http/https)은 public_id를 알 수 없어 재전송하지 않는다.
+    if (image.startsWith("http://") || image.startsWith("https://")) {
+      continue;
+    }
+    const blob = await (await fetch(image)).blob();
+    const form = new FormData();
+    form.append("file", blob, "upload");
+    const accessToken = getAppState().session.accessToken;
+    const response = await fetch(`${API_BASE_URL}/images/upload`, {
+      method: "POST",
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      body: form,
+    });
+    const uploaded = await parseResponse<{ imageId: string; url: string }>(response);
+    imageIds.push(uploaded.imageId);
+  }
+  return imageIds;
+}
+
+const auction: AuctionRepository = {
+  async listAuctions() {
+    const data = await requestJson<{ content: Record<string, unknown>[] }>(
+      "/auctions?page=0&size=50&sort=endTime,asc",
+      { method: "GET" },
+    );
+    return (data.content ?? []).map(normalizeAuction);
+  },
+
+  async getAuctionById(auctionId) {
+    try {
+      const data = await authFetch<Record<string, unknown>>(`/auctions/${auctionId}`, {
+        method: "GET",
+      });
+      return normalizeAuction(data);
+    } catch {
+      return null;
+    }
+  },
+
+  async listAuctionsBySeller(_sellerId: string) {
+    const data = await authFetch<Record<string, unknown>[]>("/auctions/mine", {
+      method: "GET",
+    });
+    return (data ?? []).map(normalizeAuction);
+  },
+
+  async createAuction(input: CreateAuctionInput, _seller: UserProfile) {
+    const imageIds = await resolveImageIds(input.images);
+    const data = await authFetch<Record<string, unknown>>("/auctions", {
+      method: "POST",
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        category: toCategoryEnum(input.category),
+        condition: toConditionEnum(input.condition),
+        startPrice: input.startPrice,
+        buyNowPrice: input.buyNowPrice,
+        endTime: toServerDateTime(input.endDateTime),
+        imageIds,
+      }),
+    });
+    const created = await this.getAuctionById(String(data.auctionId));
+    return created ?? normalizeAuction(data);
+  },
+
+  async updateAuction(auctionId: string, input: UpdateAuctionInput) {
+    const imageIds = await resolveImageIds(input.images);
+    const data = await authFetch<Record<string, unknown>>(`/auctions/${auctionId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        category: toCategoryEnum(input.category),
+        condition: toConditionEnum(input.condition),
+        startPrice: input.startPrice,
+        buyNowPrice: input.buyNowPrice,
+        endTime: toServerDateTime(input.endDateTime),
+        imageIds,
+      }),
+    });
+    return normalizeAuction(data);
+  },
+
+  async deleteAuction(auctionId: string) {
+    await authFetch<null>(`/auctions/${auctionId}`, { method: "DELETE" });
+  },
+
+  // 입찰/결제 관련 메서드는 mockRepository에 위임 (contracts 충족용)
+  async listAuctionBids() { return []; },
+  async placeBid() { throw new Error("Not implemented in http"); },
+  async listBiddingAuctions() { return []; },
+  async listWinningAuctions() { return []; },
+  async markAuctionPaid() { return null; },
+};
+
 const auth: AuthRepository = {
   async getKakaoLoginUrl() {
     const data = await requestJson<{ authorizeUrl: string; state: string }>(
@@ -552,4 +725,5 @@ const auth: AuthRepository = {
 
 export const httpRepository = {
   auth,
+  auction,
 };
