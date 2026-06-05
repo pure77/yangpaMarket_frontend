@@ -83,6 +83,8 @@ export interface Auction {
   isSold: boolean;
   winnerUserId: string | null;
   highestBidderId: string | null;
+  status: string;
+  startAt: string;
 }
 
 export interface Bid {
@@ -123,6 +125,17 @@ export interface CreateAuctionInput {
   buyNowPrice: number | null;
   endDateTime: string;
   images: string[];
+}
+
+export interface UpdateAuctionInput {
+  title: string;
+  category: string;
+  description: string;
+  condition: string;
+  startPrice: number;
+  buyNowPrice: number | null;
+  endDateTime: string;
+  images: string[]; // 기존 URL과 신규 blob/파일 URL 혼합 가능
 }
 
 export interface PlaceBidInput {

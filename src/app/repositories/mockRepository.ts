@@ -84,6 +84,8 @@ const auctionRepository: AuctionRepository = {
       isSold: false,
       winnerUserId: null,
       highestBidderId: null,
+      status: "ACTIVE",
+      startAt: nowIso(),
     };
 
     setAppState((prev) => ({
