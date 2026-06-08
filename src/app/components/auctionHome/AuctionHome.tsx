@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { Bell, Clock, Search, User } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuctions, getRemainingMinutes } from "../../hooks/useAuctions";
@@ -15,6 +16,8 @@ export function AuctionHome() {
   const { auctions, refreshAuctions, isAuctionLive } = useAuctions();
   const [activeCategory, setActiveCategory] = useState<Category>("전체");
   const [query, setQuery] = useState("");
+  // 카테고리 드래그 경계(뷰포트) 참조 — motion의 dragConstraints에 사용
+  const categoryViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void refreshAuctions();
@@ -75,20 +78,27 @@ export function AuctionHome() {
           </div>
 
           <div className="pb-4 -mx-4 px-4">
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`flex-shrink-0 h-9 px-4 rounded-full text-[14px] font-medium transition-colors whitespace-nowrap ${
-                    activeCategory === category
-                      ? "bg-[#FF6F0F] text-white"
-                      : "bg-white text-[#1A1A1A] border border-[#E8E8E8]"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
+            <div ref={categoryViewportRef} className="overflow-hidden">
+              <motion.div
+                drag="x"
+                dragConstraints={categoryViewportRef}
+                dragElastic={0.08}
+                className="flex gap-2 w-max cursor-grab active:cursor-grabbing"
+              >
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setActiveCategory(category)}
+                    className={`flex-shrink-0 h-9 px-4 rounded-full text-[14px] font-medium transition-colors whitespace-nowrap ${
+                      activeCategory === category
+                        ? "bg-[#FF6F0F] text-white"
+                        : "bg-white text-[#1A1A1A] border border-[#E8E8E8]"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </motion.div>
             </div>
           </div>
 
