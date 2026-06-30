@@ -30,11 +30,22 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // sockjs-client가 참조하는 전역 `global`을 브라우저에서 globalThis로 매핑(런타임 ReferenceError 방지)
+  define: {
+    global: 'globalThis',
+  },
+
   server: {
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+      },
+      // STOMP/SockJS 핸드셰이크 + WebSocket 업그레이드를 백엔드로 프록시
+      '/ws': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: true,
       },
     },
   },
