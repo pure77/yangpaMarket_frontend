@@ -3,11 +3,13 @@
   AuctionImageInput,
   AuthNotice,
   AuthSession,
+  Bid,
   CompleteKakaoCallbackInput,
   CompleteSignupInput,
   CreateAuctionInput,
   KakaoCallbackResult,
   PendingSignup,
+  PlaceBidInput,
   TokenBundle,
   UpdateAuctionInput,
   UserProfile,
@@ -466,7 +468,7 @@ function normalizeAuction(payload: Record<string, unknown>): Auction {
     sellerId,
     sellerName: seller.nickname ? String(seller.nickname) : "판매자",
     isSold: String(payload.status ?? "") === "PAID",
-    winnerUserId: null,
+    winnerUserId: payload.winnerUserId ? String(payload.winnerUserId) : null,
     highestBidderId: null,
     status: String(payload.status ?? "ACTIVE"),
     startAt,
@@ -567,9 +569,60 @@ const auction: AuctionRepository = {
     await authFetch<null>(`/auctions/${auctionId}`, { method: "DELETE" });
   },
 
-  // 입찰/결제 관련 메서드는 mockRepository에 위임 (contracts 충족용)
-  async listAuctionBids() { return []; },
-  async placeBid() { throw new Error("Not implemented in http"); },
+  // 입찰 내역(공개): 서버가 닉네임을 마스킹해 내려주므로 그대로 사용한다.
+  async listAuctionBids(auctionId: string) {
+    const data = await requestJson<{
+      content: { maskedNickname: string; price: number; createdAt: string; isHighest: boolean }[];
+    }>(`/auctions/${auctionId}/bids?page=0&size=50`, { method: "GET" });
+    return (data.content ?? []).map((item, index): Bid => ({
+      id: `${auctionId}-${index}-${item.createdAt}`,
+      auctionId,
+      bidderId: "", // 서버가 입찰자 식별자를 노출하지 않음(마스킹)
+      bidderName: item.maskedNickname,
+      amount: item.price,
+      createdAt: item.createdAt,
+      isHighest: item.isHighest,
+    }));
+  },
+
+  // 입찰(인증): POST 후 응답으로 스토어의 경매를 patch한 사본 + 내 입찰 1건을 반환한다.
+  async placeBid(input: PlaceBidInput) {
+    const data = await authFetch<{
+      bidId: string;
+      price: number;
+      currentHighestPrice: number;
+      bidCount: number;
+      createdAt: string;
+    }>(`/auctions/${input.auctionId}/bids`, {
+      method: "POST",
+      body: JSON.stringify({ amount: input.amount }),
+    });
+
+    // 반환 계약({ auction, bid })을 채우기 위해 기존 경매를 기준으로 현재가/입찰수를 갱신
+    const existing = getAppState().auctions.find((item) => item.id === input.auctionId);
+    const baseAuction = existing ?? (await this.getAuctionById(input.auctionId));
+    if (!baseAuction) {
+      throw new HttpApiError(404, "경매를 찾을 수 없습니다.", "AUCTION_NOT_FOUND");
+    }
+    const auction: Auction = {
+      ...baseAuction,
+      currentBid: data.currentHighestPrice,
+      bidCount: data.bidCount,
+      highestBidderId: input.bidderId,
+    };
+    const bid: Bid = {
+      id: data.bidId,
+      auctionId: input.auctionId,
+      bidderId: input.bidderId,
+      bidderName: input.bidderName,
+      amount: data.price,
+      createdAt: data.createdAt,
+      isHighest: true,
+    };
+    return { auction, bid };
+  },
+
+  // 아래 3개는 아직 http 미구현 → index.ts에서 mock으로 합성한다(contracts 충족용 stub).
   async listBiddingAuctions() { return []; },
   async listWinningAuctions() { return []; },
   async markAuctionPaid() { return null; },
