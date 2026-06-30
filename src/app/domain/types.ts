@@ -127,6 +127,7 @@ export interface Bid {
   bidderName: string;
   amount: number;      // 입찰 금액 (원)
   createdAt: string;
+  isHighest?: boolean; // 현재 최고가 입찰 여부 (입찰내역 강조용; 서버 isHighest 또는 WS 갱신값)
 }
 
 // ─── 결제 ─────────────────────────────────────────────────────
@@ -183,6 +184,22 @@ export interface PlaceBidInput {
   amount: number;
   bidderId: string;
   bidderName: string;
+}
+
+/** WS 수신: 입찰 갱신 broadcast (/topic/auction/{id}) */
+export interface BidUpdateMessage {
+  type: "BID_UPDATE";
+  currentPrice: number;
+  bidCount: number;
+  remainingTime: number; // 종료까지 남은 초 (참고용)
+  maskedBidder: string;  // 마스킹된 입찰자 닉네임 (서버에서 마스킹)
+}
+
+/** WS 수신: 경매 종료 broadcast */
+export interface AuctionEndedMessage {
+  type: "AUCTION_ENDED";
+  finalPrice: number;
+  winnerId: string | null; // 낙찰자 publicId (입찰 없으면 null)
 }
 
 /** 결제 완료 처리 입력 */
