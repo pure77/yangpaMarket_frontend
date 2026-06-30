@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, Heart, Share2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Heart, Home, Share2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../../hooks/useAuth";
-import { getRemainingMinutes, useAuctions } from "../../hooks/useAuctions";
-import { formatPrice, formatTimeAgo, formatTimeLeftSeconds } from "../../utils/format";
+import { getMinutesUntilStart, getRemainingMinutes, useAuctions } from "../../hooks/useAuctions";
+import { formatPrice, formatTimeAgo, formatTimeLeftSmart } from "../../utils/format";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import {
   AlertDialog,
@@ -109,15 +109,23 @@ export function AuctionDetail() {
   };
 
   const isUnderOneHour = getRemainingMinutes(auction.endAt) < 60;
+  const live = isAuctionLive(auction);
+  // 아직 공개 전(예약 5분)이면 마감까지 남은 시간 대신 공개까지 남은 시간을 보여준다.
+  const minutesUntilStart = getMinutesUntilStart(auction.startAt);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* 상품 이미지/설명/입찰내역은 스크롤 영역에, 입찰 버튼은 하단 고정으로 배치합니다. */}
       <div className="sticky top-0 bg-white z-20 border-b border-[#E8E8E8]">
         <div className="max-w-[390px] mx-auto px-4 h-14 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="p-1">
-            <ArrowLeft className="w-6 h-6 text-[#1A1A1A]" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => navigate(-1)} className="p-1" aria-label="뒤로가기">
+              <ArrowLeft className="w-6 h-6 text-[#1A1A1A]" />
+            </button>
+            <button onClick={() => navigate("/auctions")} className="p-1" aria-label="홈으로">
+              <Home className="w-6 h-6 text-[#1A1A1A]" />
+            </button>
+          </div>
           <div className="flex items-center gap-2">
             {canManageAuction(auction) && (
               <>
@@ -195,10 +203,14 @@ export function AuctionDetail() {
                 <p className="text-[18px] font-bold text-[#1A1A1A]">{auction.bidCount}회</p>
               </div>
               <div className="text-center">
-                <p className="text-[12px] text-[#888888] mb-1">남은 시간</p>
-                <p className={`text-[16px] font-bold ${isUnderOneHour ? "text-[#FF3B30]" : "text-[#1A1A1A]"}`}>
-                  {formatTimeLeftSeconds(remainingSeconds)}
-                </p>
+                <p className="text-[12px] text-[#888888] mb-1">{live ? "남은 시간" : "공개까지"}</p>
+                {live ? (
+                  <p className={`text-[16px] font-bold ${isUnderOneHour ? "text-[#FF3B30]" : "text-[#1A1A1A]"}`}>
+                    {formatTimeLeftSmart(remainingSeconds)}
+                  </p>
+                ) : (
+                  <p className="text-[16px] font-bold text-[#FF6F0F]">약 {minutesUntilStart}분 후</p>
+                )}
               </div>
             </div>
           </div>

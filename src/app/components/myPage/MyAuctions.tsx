@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MoreVertical } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useAuctions } from "../../hooks/useAuctions";
+import { getMinutesUntilStart, useAuctions } from "../../hooks/useAuctions";
 import { formatPrice } from "../../utils/format";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import type { Auction } from "../../domain/types";
@@ -11,6 +11,7 @@ export function MyAuctions() {
   const { listMySellingAuctions, canManageAuction, deleteAuction, isAuctionLive } = useAuctions();
   const [items, setItems] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const reload = async () => {
     setLoading(true);
@@ -48,48 +49,75 @@ export function MyAuctions() {
           {!loading && items.length === 0 && (
             <p className="text-[14px] text-[#888888] text-center py-8">등록한 경매가 없습니다.</p>
           )}
-          {items.map((auction) => (
-            <div
-              key={auction.id}
-              className="flex gap-3 border border-[#E8E8E8] rounded-[12px] p-3"
-            >
-              <button onClick={() => navigate(`/auctions/${auction.id}`)} className="flex-shrink-0">
-                <ImageWithFallback
-                  src={auction.images[0] ?? ""}
-                  alt={auction.title}
-                  className="w-20 h-20 object-cover rounded-[8px] bg-[#F5F5F5]"
-                />
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[11px] font-medium text-[#888888] bg-[#F5F5F5] px-2 py-0.5 rounded">
-                    {statusLabel(auction)}
-                  </span>
+          {items.map((auction) => {
+            const manageable = canManageAuction(auction);
+            // 아직 공개 전이면 몇 분 뒤에 경매가 올라가는지 안내한다.
+            const minutesUntilStart = isAuctionLive(auction) ? 0 : getMinutesUntilStart(auction.startAt);
+            return (
+              <div
+                key={auction.id}
+                className="relative flex gap-3 border border-[#E8E8E8] rounded-[12px] p-3"
+              >
+                <button onClick={() => navigate(`/auctions/${auction.id}`)} className="flex-shrink-0">
+                  <ImageWithFallback
+                    src={auction.images[0] ?? ""}
+                    alt={auction.title}
+                    className="w-20 h-20 object-cover rounded-[8px] bg-[#F5F5F5]"
+                  />
+                </button>
+                <div className="flex-1 min-w-0 pr-7">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[11px] font-medium text-[#888888] bg-[#F5F5F5] px-2 py-0.5 rounded">
+                      {statusLabel(auction)}
+                    </span>
+                    {minutesUntilStart > 0 && auction.status !== "CANCELLED" && (
+                      <span className="text-[11px] font-medium text-[#FF6F0F]">
+                        약 {minutesUntilStart}분 후 공개
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-[14px] font-medium text-[#1A1A1A] line-clamp-1">{auction.title}</h3>
+                  <p className="text-[15px] font-bold text-[#FF6F0F] mt-1">{formatPrice(auction.currentBid)}</p>
                 </div>
-                <h3 className="text-[14px] font-medium text-[#1A1A1A] line-clamp-1">{auction.title}</h3>
-                <p className="text-[15px] font-bold text-[#FF6F0F] mt-1">{formatPrice(auction.currentBid)}</p>
-                {canManageAuction(auction) && (
-                  <div className="flex gap-2 mt-2">
+
+                {/* 오른쪽 위 햄버거 메뉴: 입찰 전(관리 가능)일 때만 수정/삭제 제공 */}
+                {manageable && (
+                  <div className="absolute top-2 right-2">
                     <button
-                      onClick={() => navigate(`/auctions/${auction.id}/edit`)}
-                      className="text-[13px] font-medium text-[#1A1A1A] border border-[#E8E8E8] rounded-[6px] px-3 py-1"
+                      onClick={() => setOpenMenuId((prev) => (prev === auction.id ? null : auction.id))}
+                      className="p-1 text-[#888888]"
+                      aria-label="메뉴 열기"
                     >
-                      수정
+                      <MoreVertical className="w-5 h-5" />
                     </button>
-                    <button
-                      onClick={async () => {
-                        await deleteAuction(auction.id);
-                        await reload();
-                      }}
-                      className="text-[13px] font-medium text-[#FF3B30] border border-[#E8E8E8] rounded-[6px] px-3 py-1"
-                    >
-                      삭제
-                    </button>
+                    {openMenuId === auction.id && (
+                      <div className="absolute right-0 mt-1 w-24 bg-white border border-[#E8E8E8] rounded-[8px] shadow-md overflow-hidden z-10">
+                        <button
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            navigate(`/auctions/${auction.id}/edit`);
+                          }}
+                          className="w-full text-left text-[13px] font-medium text-[#1A1A1A] px-3 py-2 hover:bg-[#F5F5F5]"
+                        >
+                          수정
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setOpenMenuId(null);
+                            await deleteAuction(auction.id);
+                            await reload();
+                          }}
+                          className="w-full text-left text-[13px] font-medium text-[#FF3B30] px-3 py-2 hover:bg-[#F5F5F5]"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

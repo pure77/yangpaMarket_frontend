@@ -1,5 +1,6 @@
 ﻿import type {
   Auction,
+  AuctionImageInput,
   AuthNotice,
   AuthSession,
   CompleteKakaoCallbackInput,
@@ -429,13 +430,29 @@ function normalizeAuction(payload: Record<string, unknown>): Auction {
     : payload.thumbnailUrl
       ? [payload.thumbnailUrl as string]
       : [];
+  const imageIds = Array.isArray(payload.imageIds)
+    ? (payload.imageIds as string[])
+    : undefined;
   const seller = (payload.seller ?? {}) as Record<string, unknown>;
+  // 공개 예정 시각: startTime이 있으면 사용, 없으면(목록 응답 등) 과거값으로 둬서
+  // 서버가 이미 필터링한 목록을 프론트에서 다시 숨기지 않도록 한다.
+  const startAt = payload.startTime
+    ? String(payload.startTime)
+    : payload.createdAt
+      ? String(payload.createdAt)
+      : new Date(0).toISOString();
+  const sellerId = seller.userId
+    ? String(seller.userId)
+    : payload.sellerId
+      ? String(payload.sellerId)
+      : "";
   return {
     id: String(payload.auctionId ?? ""),
     title: String(payload.title ?? ""),
     category: fromCategoryEnum(payload.category as string | undefined),
     description: String(payload.description ?? ""),
     images,
+    imageIds,
     condition: fromConditionEnum(payload.condition as string | undefined),
     startPrice: Number(payload.startPrice ?? payload.currentPrice ?? 0),
     currentBid: Number(payload.currentPrice ?? 0),
@@ -446,26 +463,30 @@ function normalizeAuction(payload: Record<string, unknown>): Auction {
         : Number(payload.buyNowPrice),
     endAt: String(payload.endTime ?? ""),
     createdAt: String(payload.createdAt ?? payload.startTime ?? new Date().toISOString()),
-    sellerId: seller.userId ? String(seller.userId) : "",
+    sellerId,
     sellerName: seller.nickname ? String(seller.nickname) : "판매자",
     isSold: String(payload.status ?? "") === "PAID",
     winnerUserId: null,
     highestBidderId: null,
     status: String(payload.status ?? "ACTIVE"),
-    startAt: String(payload.startTime ?? payload.endTime ?? new Date().toISOString()),
+    startAt,
   };
 }
 
-async function resolveImageIds(images: string[]): Promise<string[]> {
+async function resolveImageIds(images: AuctionImageInput[]): Promise<string[]> {
+  // 기존 이미지(id 보유)는 그대로 재사용하고, 신규 파일만 업로드해 imageId를 발급받는다.
+  // 순서를 보존해야 대표 이미지(첫 번째)와 정렬이 유지된다.
   const imageIds: string[] = [];
-  for (const image of images) {
-    // 이미 서버에 저장된 URL(http/https)은 public_id를 알 수 없어 재전송하지 않는다.
-    if (image.startsWith("http://") || image.startsWith("https://")) {
+  for (const item of images) {
+    if (item.id) {
+      imageIds.push(item.id);
       continue;
     }
-    const blob = await (await fetch(image)).blob();
+    if (!item.file) {
+      continue;
+    }
     const form = new FormData();
-    form.append("file", blob, "upload");
+    form.append("file", item.file, item.file.name || "upload");
     const accessToken = getAppState().session.accessToken;
     const response = await fetch(`${API_BASE_URL}/images/upload`, {
       method: "POST",

@@ -4,6 +4,7 @@ import { ImageWithFallback } from '../figma/ImageWithFallback';
 import { useNavigate, useParams } from 'react-router';
 import { useAuctions } from '../../hooks/useAuctions';
 import { useAuth } from '../../hooks/useAuth';
+import type { AuctionImageInput } from '../../domain/types';
 
 type ProductCondition = '미사용' | '거의새것' | '사용감있음';
 
@@ -14,7 +15,7 @@ export function AuctionRegister() {
   const { createAuction, updateAuction, getAuctionById, ensureAuctionLoaded } = useAuctions();
   const { isAuthenticated } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<AuctionImageInput[]>([]);
   const [productCondition, setProductCondition] = useState<ProductCondition>('거의새것');
   const [enableBuyNow, setEnableBuyNow] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -48,7 +49,12 @@ export function AuctionRegister() {
       if (loaded.buyNowPrice) {
         setEnableBuyNow(true);
       }
-      setUploadedImages(loaded.images ?? []);
+      // 기존 이미지: URL과 함께 publicId(imageIds)를 보존해 수정 시 재업로드 없이 유지한다.
+      const existing = (loaded.images ?? []).map((url, index) => ({
+        url,
+        id: loaded.imageIds?.[index],
+      }));
+      setUploadedImages(existing);
     })();
   }, [auctionId]);
 
@@ -63,8 +69,11 @@ export function AuctionRegister() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      // 현재는 mock 단계라 서버 업로드 대신 로컬 미리보기 URL을 생성합니다.
-      const newImages = Array.from(files).map((file) => URL.createObjectURL(file));
+      // 신규 파일은 미리보기 objectURL과 File을 함께 보관해 제출 시 업로드한다.
+      const newImages: AuctionImageInput[] = Array.from(files).map((file) => ({
+        url: URL.createObjectURL(file),
+        file,
+      }));
       setUploadedImages((prev) => [...prev, ...newImages].slice(0, 10));
     }
   };
@@ -121,10 +130,11 @@ export function AuctionRegister() {
       };
       if (isEditMode && auctionId) {
         await updateAuction(auctionId, payload);
-        navigate(`/auctions/${auctionId}`);
+        // replace로 이동해 상세에서 뒤로가기 시 등록/수정 폼으로 되돌아가지 않게 한다.
+        navigate(`/auctions/${auctionId}`, { replace: true });
       } else {
         const created = await createAuction(payload);
-        navigate(`/auctions/${created.id}`);
+        navigate(`/auctions/${created.id}`, { replace: true });
       }
     } finally {
       setIsSubmitting(false);
@@ -197,7 +207,7 @@ export function AuctionRegister() {
                     {uploadedImages.map((image, index) => (
                       <div key={index} className="relative flex-shrink-0">
                         <ImageWithFallback
-                          src={image}
+                          src={image.url}
                           alt={`Upload ${index + 1}`}
                           className="w-20 h-20 object-cover rounded-[8px]"
                         />

@@ -15,6 +15,12 @@ export function getRemainingMinutes(endAt: string): number {
   return Math.max(0, Math.ceil(diff / 60_000));
 }
 
+export function getMinutesUntilStart(startAt: string): number {
+  // 공개 예정 시각까지 남은 분(올림). 이미 공개됐으면 0.
+  const diff = new Date(startAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / 60_000));
+}
+
 export function useAuctions() {
   // 경매/입찰 데이터는 스토어 구독으로 가져와 화면과 즉시 동기화합니다.
   const auctions = useAppSelector((state) => state.auctions);
@@ -40,10 +46,12 @@ export function useAuctions() {
   };
 
   const ensureAuctionLoaded = async (auctionId: string) => {
+    // 스토어에 이미 있으면 서버 요청 없이 재사용 (상세 화면 진입 최적화)
     const existing = getAppState().auctions.find((item) => item.id === auctionId);
     if (existing) return existing;
     const fetched = await repositories.auction.getAuctionById(auctionId);
     if (fetched) {
+      // 기존 목록에서 같은 id를 제거하고 최신 데이터로 교체
       setAppState((prev) => ({
         ...prev,
         auctions: [fetched, ...prev.auctions.filter((item) => item.id !== fetched.id)],
@@ -78,10 +86,12 @@ export function useAuctions() {
     }));
   };
 
+  // ACTIVE 상태이고 공개 시각(startAt)이 지난 경매만 라이브로 판단
   const isAuctionLive = (auction: Auction) => {
     return auction.status === "ACTIVE" && new Date(auction.startAt).getTime() <= Date.now();
   };
 
+  // 본인 경매이면서 입찰 0건 + ACTIVE일 때만 수정/삭제 버튼 노출
   const canManageAuction = (auction: Auction) => {
     return (
       !!sessionUser &&

@@ -67,12 +67,13 @@ const auctionRepository: AuctionRepository = {
   },
 
   async createAuction(input, seller) {
+    const imageUrls = input.images.map((item) => item.url);
     const created: Auction = {
       id: nextId("auction"),
       title: input.title,
       category: input.category,
       description: input.description,
-      images: input.images.length > 0 ? input.images : ["/fallback-image"],
+      images: imageUrls.length > 0 ? imageUrls : ["/fallback-image"],
       condition: input.condition,
       startPrice: input.startPrice,
       currentBid: input.startPrice,
@@ -115,7 +116,7 @@ const auctionRepository: AuctionRepository = {
           currentBid: input.startPrice,
           buyNowPrice: input.buyNowPrice,
           endAt: input.endDateTime || item.endAt,
-          images: input.images.length > 0 ? input.images : item.images,
+          images: input.images.length > 0 ? input.images.map((image) => image.url) : item.images,
         };
         return updated;
       }),
