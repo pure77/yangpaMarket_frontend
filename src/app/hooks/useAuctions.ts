@@ -102,12 +102,26 @@ export function useAuctions() {
   };
 
   const placeBid = async (auctionId: string, amount: number) => {
-    return repositories.auction.placeBid({
+    const result = await repositories.auction.placeBid({
       auctionId,
       amount,
       bidderId: currentUser.id,
       bidderName: currentUser.nickname,
     });
+    // 낙관적 반영: WS BID_UPDATE 에코가 늦거나 순간 끊겨도 입찰자 본인 화면이
+    // 즉시 갱신되도록 반환된 경매/입찰을 스토어에 반영한다.
+    // (이후 WS 에코/재연결 resync가 서버 최신값으로 덮어써 정합성을 회복한다)
+    setAppState((prev) => ({
+      ...prev,
+      auctions: prev.auctions.map((item) => (item.id === auctionId ? result.auction : item)),
+      bids: [
+        result.bid,
+        ...prev.bids.map((item) =>
+          item.auctionId === auctionId ? { ...item, isHighest: false } : item,
+        ),
+      ],
+    }));
+    return result;
   };
 
   const getSuggestedNextBid = (auctionId: string) => {
