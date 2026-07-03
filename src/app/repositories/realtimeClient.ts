@@ -40,7 +40,12 @@ function subscribeTopic(auctionId: string): void {
     return;
   }
   entry.stompSub = client.subscribe(topic(auctionId), (frame: IMessage) => {
-    const payload = JSON.parse(frame.body) as BidUpdateMessage | AuctionEndedMessage;
+    let payload: BidUpdateMessage | AuctionEndedMessage;
+    try {
+      payload = JSON.parse(frame.body) as BidUpdateMessage | AuctionEndedMessage;
+    } catch {
+      return; // 잘못된 프레임은 무시(구독 콜백이 깨지지 않도록)
+    }
     entry.handlers.forEach((h) => {
       if (payload.type === "BID_UPDATE") {
         h.onBidUpdate(payload);
@@ -55,25 +60,39 @@ function ensureClient(): void {
   if (client) {
     return;
   }
-  client = new Client({
+  // 로컬 c로 인스턴스를 캡처해, 비활성화 후 새로 만든 클라이언트와의 레이스에서
+  // "오래된 클라이언트"의 콜백이 현재 상태(entries/status)를 건드리지 못하게 가드한다.
+  const c: Client = new Client({
     webSocketFactory: () => new SockJS("/ws"),
     reconnectDelay: 3000, // 끊기면 3초 후 자동 재연결
     onConnect: () => {
+      if (c !== client) {
+        return; // 이미 교체된 오래된 클라이언트의 이벤트는 무시
+      }
       notifyStatus("connected");
       // (재)연결 시 등록된 모든 경매를 다시 구독
       entries.forEach((_entry, auctionId) => subscribeTopic(auctionId));
     },
     onWebSocketClose: () => {
+      if (c !== client) {
+        return; // 오래된 클라이언트의 close가 현재 entries의 구독을 무효화하지 않도록
+      }
       // 끊기면 기존 STOMP 구독 핸들은 무효 → 재연결 시 새로 구독하도록 비운다.
       entries.forEach((entry) => {
         entry.stompSub = null;
       });
       notifyStatus("disconnected");
     },
-    onStompError: () => notifyStatus("disconnected"),
+    onStompError: () => {
+      if (c !== client) {
+        return;
+      }
+      notifyStatus("disconnected");
+    },
   });
+  client = c;
   notifyStatus("connecting");
-  client.activate();
+  c.activate();
 }
 
 /**
