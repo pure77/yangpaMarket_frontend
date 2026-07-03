@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, Heart, Home, Share2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Home, Share2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../../hooks/useAuth";
 import { getMinutesUntilStart, getRemainingMinutes, useAuctions } from "../../hooks/useAuctions";
@@ -24,7 +24,6 @@ export function AuctionDetail() {
   const {
     getAuctionById,
     getAuctionBids,
-    getSuggestedNextBid,
     placeBid,
     ensureAuctionLoaded,
     isAuctionLive,
