@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { Bell, Clock, Search, User } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuctions, getRemainingMinutes } from "../../hooks/useAuctions";
+import { useAuctionListPolling } from "../../hooks/useAuctionListPolling";
 import { formatPrice, formatTimeLeftMinutes } from "../../utils/format";
 import { BottomNav } from "../common/BottomNav";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
@@ -22,6 +23,9 @@ export function AuctionHome() {
   useEffect(() => {
     void refreshAuctions();
   }, []);
+
+  // 홈을 보고 있는 동안 5초마다 목록을 재조회해 상세 화면과 가격 정합성을 맞춘다(접근 B).
+  useAuctionListPolling(refreshAuctions);
 
   const filteredAuctions = useMemo(() => {
     // 카테고리 + 검색어를 동시에 적용해 홈 카드 목록을 만듭니다.
