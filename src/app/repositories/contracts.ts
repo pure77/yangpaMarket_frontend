@@ -28,6 +28,7 @@ export interface ApiError {
   status: number;   // HTTP 상태 코드
   message: string;
   code: string | null; // 서버 에러 코드 (예: "UNAUTHORIZED")
+  data: unknown;    // 실패 응답의 data. 대부분 null이고, BID_TOO_LOW만 채워진다
 }
 
 /**

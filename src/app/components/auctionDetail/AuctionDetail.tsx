@@ -5,6 +5,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { getMinutesUntilStart, getRemainingMinutes, useAuctions } from "../../hooks/useAuctions";
 import { formatPrice, formatTimeAgo, formatTimeLeftSmart } from "../../utils/format";
 import { useAuctionRealtime } from "../../hooks/useAuctionRealtime";
+import { readMinimumBid } from "../../repositories/apiError";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import {
   AlertDialog,
@@ -129,7 +130,15 @@ export function AuctionDetail() {
         navigate(`/payment/${result.auction.id}`);
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "입찰 중 문제가 발생했습니다.");
+      // [거절 시 재시도를 확정으로] 서버가 유효 입찰가를 주면 입력창을 그 값으로 채운다.
+      // 버튼은 누르지 않는다 — 입찰은 금전 행위라 항상 사용자가 확인하고 눌러야 한다.
+      const minimum = readMinimumBid(error);
+      if (minimum !== null) {
+        setBidAmount(minimum);
+        setErrorMessage(`가격이 올랐습니다. ${formatPrice(minimum)} 이상으로 다시 시도해주세요.`);
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : "입찰 중 문제가 발생했습니다.");
+      }
     } finally {
       setIsBidding(false);
     }

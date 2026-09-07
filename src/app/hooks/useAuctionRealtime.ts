@@ -47,6 +47,13 @@ export function useAuctionRealtime(auctionId: string): { connectionStatus: Conne
       },
       onBidUpdate: (msg: BidUpdateMessage) => {
         setAppState((prev) => {
+          // [단조 가드] 현재가는 절대 내려가지 않는다. 늦게 도착했거나 중복된 메시지는 버린다.
+          // 지금은 서버가 락 안에서 발행해 순서가 보장되므로 발동하지 않는다.
+          // 멀티 인스턴스로 전환하면 인스턴스 간 순서가 느슨해져 이 가드가 실제로 일한다.
+          const current = prev.auctions.find((a) => a.id === auctionId);
+          if (current && msg.currentPrice <= current.currentBid) {
+            return prev;
+          }
           const newBid: Bid = {
             id: `${auctionId}-ws-${Date.now()}`,
             auctionId,
