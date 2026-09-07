@@ -111,7 +111,7 @@ function mapMeResponse(payload: unknown): UserProfile {
 
   return {
     id: String(userId),
-    nickname: typeof nickname === "string" ? nickname : "?뚯썝",
+    nickname: typeof nickname === "string" ? nickname : "회원",
     email: typeof email === "string" ? email : "",
     phone: typeof phone === "string" ? phone : "",
   };

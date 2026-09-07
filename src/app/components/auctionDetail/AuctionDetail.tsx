@@ -116,6 +116,9 @@ export function AuctionDetail() {
     const amount = typeof bidAmount === "number" ? bidAmount : 0;
     // 클라이언트 1차 검증(서버도 BID_TOO_LOW로 재검증)
     if (amount < minBid) {
+      // [서버 거절 경로와 같은 UX] 대기 중 현재가가 올라 내 금액이 낡았을 때,
+      // 안내만 하고 낡은 값을 남겨두면 사용자가 직접 고쳐야 한다. 여기서도 채워준다.
+      setBidAmount(minBid);
       setErrorMessage(`최소 ${formatPrice(minBid)} 이상 입력해주세요.`);
       return;
     }
