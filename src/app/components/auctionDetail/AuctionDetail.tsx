@@ -149,7 +149,7 @@ export function AuctionDetail() {
 
   const isUnderOneHour = getRemainingMinutes(auction.endAt) < 60;
   const live = isAuctionLive(auction);
-  // 아직 공개 전(예약 5분)이면 마감까지 남은 시간 대신 공개까지 남은 시간을 보여준다.
+  // 아직 공개 전(공개 유예 1분)이면 마감까지 남은 시간 대신 공개까지 남은 시간을 보여준다.
   const minutesUntilStart = getMinutesUntilStart(auction.startAt);
 
   return (

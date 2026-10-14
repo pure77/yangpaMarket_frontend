@@ -466,7 +466,7 @@ export function AuctionRegister() {
 
               <div className="bg-[#FFF4F0] border border-[#FF6F0F]/20 rounded-[12px] p-4">
                 <p className="text-[13px] text-[#FF6F0F] leading-relaxed">
-                  입찰 전까지 수정 가능합니다. 등록 5분 뒤 공개되고 입찰이 시작됩니다.
+                  입찰 전까지 수정 가능합니다. 등록 1분 뒤 공개되고 입찰이 시작됩니다.
                 </p>
               </div>
             </div>
