@@ -1,10 +1,15 @@
 import { httpRepository } from "./httpRepository";
 import { mockRepository } from "./mockRepository";
 
-// 현재 모드: 경매/결제는 mock, 인증은 실제 http 연동을 사용합니다.
-// API 전환 시 이 매핑만 바꾸면 hooks/컴포넌트 코드는 그대로 유지됩니다.
+// 경매: CRUD/목록/입찰/입찰내역은 실제 http.
+// 아직 http 미구현인 입찰중/낙찰/결제표시 3개만 mock으로 합성한다.
 export const repositories = {
-  auction: mockRepository.auction,
+  auction: {
+    ...httpRepository.auction,
+    listBiddingAuctions: mockRepository.auction.listBiddingAuctions,
+    listWinningAuctions: mockRepository.auction.listWinningAuctions,
+    markAuctionPaid: mockRepository.auction.markAuctionPaid,
+  },
   payment: mockRepository.payment,
   auth: httpRepository.auth,
 };

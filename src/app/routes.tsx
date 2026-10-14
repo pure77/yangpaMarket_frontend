@@ -7,6 +7,7 @@ import { RequireAuth } from "./components/common/RequireAuth";
 import { AuthScreen } from "./components/login/AuthScreen";
 import { KakaoCallbackScreen } from "./components/login/KakaoCallbackScreen";
 import { SignupCompleteScreen } from "./components/login/SignupCompleteScreen";
+import { MyAuctions } from "./components/myPage/MyAuctions";
 import { MyPage } from "./components/myPage/MyPage";
 import { Payment } from "./components/payment/Payment";
 
@@ -102,7 +103,7 @@ function ProtectedMyPage() {
 function ProtectedMyAuctionsPage() {
   return (
     <RequireAuth>
-      <MyAuctionsPage />
+      <MyAuctions />
     </RequireAuth>
   );
 }
@@ -190,6 +191,10 @@ export const router = createBrowserRouter([
   },
   {
     path: "/auctions/new",
+    Component: ProtectedAuctionRegister,
+  },
+  {
+    path: "/auctions/:auctionId/edit",
     Component: ProtectedAuctionRegister,
   },
   {

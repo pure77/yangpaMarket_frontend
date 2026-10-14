@@ -49,6 +49,8 @@ export function createInitialAppState(): AppState {
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-3",
+        status: "ACTIVE",
+        startAt: new Date().toISOString(),
       },
       {
         id: "auction-2",
@@ -70,6 +72,8 @@ export function createInitialAppState(): AppState {
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-5",
+        status: "ACTIVE",
+        startAt: new Date().toISOString(),
       },
       {
         id: "auction-3",
@@ -91,6 +95,8 @@ export function createInitialAppState(): AppState {
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-1",
+        status: "ACTIVE",
+        startAt: new Date().toISOString(),
       },
       {
         id: "auction-4",
@@ -112,6 +118,8 @@ export function createInitialAppState(): AppState {
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-8",
+        status: "ACTIVE",
+        startAt: new Date().toISOString(),
       },
       {
         id: "auction-5",
@@ -133,6 +141,8 @@ export function createInitialAppState(): AppState {
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-4",
+        status: "ACTIVE",
+        startAt: new Date().toISOString(),
       },
       {
         id: "auction-6",
@@ -154,6 +164,8 @@ export function createInitialAppState(): AppState {
         isSold: false,
         winnerUserId: null,
         highestBidderId: "user-11",
+        status: "ACTIVE",
+        startAt: new Date().toISOString(),
       },
     ],
     // 입찰 내역 샘플 데이터: 상세 화면의 입찰 히스토리 UI를 위해 사용됩니다.

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Hammer } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../hooks/useAuth";
+import { DevLoginPanel } from "./DevLoginPanel";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
@@ -88,6 +89,13 @@ export function AuthScreen() {
             <p className="text-[13px] text-[#FF3B30]">{errorMessage}</p>
           </div>
         )}
+
+        {/*
+          로컬 개발(npm run dev)에서만 노출되는 테스트 로그인 패널.
+          import.meta.env.DEV는 프로덕션 빌드에서 false로 치환되므로
+          이 블록과 DevLoginPanel 모듈 전체가 번들에서 제거됩니다.
+        */}
+        {import.meta.env.DEV && <DevLoginPanel />}
       </div>
     </div>
   );

@@ -1,15 +1,21 @@
 ﻿import type {
+  Auction,
+  AuctionImageInput,
   AuthNotice,
   AuthSession,
+  Bid,
   CompleteKakaoCallbackInput,
   CompleteSignupInput,
+  CreateAuctionInput,
   KakaoCallbackResult,
   PendingSignup,
+  PlaceBidInput,
   TokenBundle,
+  UpdateAuctionInput,
   UserProfile,
 } from "../domain/types";
 import { getAppState, setAppState } from "../state/appStore";
-import type { ApiError as ApiErrorShape, ApiResponse, AuthRepository } from "./contracts";
+import type { ApiError as ApiErrorShape, ApiResponse, AuctionRepository, AuthRepository } from "./contracts";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 const REFRESH_TOKEN_KEY = "ym_refresh_token";
@@ -19,12 +25,14 @@ const PENDING_SIGNUP_KEY = "ym_pending_signup";
 class HttpApiError extends Error implements ApiErrorShape {
   status: number;
   code: string | null;
+  data: unknown; // 실패 응답의 data (BID_TOO_LOW의 유효 입찰가 등). 대부분 null.
 
-  constructor(status: number, message: string, code: string | null = null) {
+  constructor(status: number, message: string, code: string | null = null, data: unknown = null) {
     super(message);
     this.name = "HttpApiError";
     this.status = status;
     this.code = code;
+    this.data = data;
   }
 }
 
@@ -88,7 +96,7 @@ function clearPendingSignup(): void {
 
 function mapMeResponse(payload: unknown): UserProfile {
   if (!payload || typeof payload !== "object") {
-    throw new HttpApiError(500, "?ъ슜???뺣낫瑜??쎌쓣 ???놁뒿?덈떎.", "INVALID_ME_PAYLOAD");
+    throw new HttpApiError(500, "사용자 정보를 읽을 수 없습니다.", "INVALID_ME_PAYLOAD");
   }
 
   const source = payload as Record<string, unknown>;
@@ -98,12 +106,12 @@ function mapMeResponse(payload: unknown): UserProfile {
   const phone = source.phone;
 
   if (typeof userId !== "string" && typeof userId !== "number") {
-    throw new HttpApiError(500, "?ъ슜??ID媛 ?놁뒿?덈떎.", "INVALID_ME_PAYLOAD");
+    throw new HttpApiError(500, "사용자 ID가 없습니다.", "INVALID_ME_PAYLOAD");
   }
 
   return {
     id: String(userId),
-    nickname: typeof nickname === "string" ? nickname : "?뚯썝",
+    nickname: typeof nickname === "string" ? nickname : "회원",
     email: typeof email === "string" ? email : "",
     phone: typeof phone === "string" ? phone : "",
   };
@@ -114,7 +122,7 @@ function parseApiPayload<T>(payload: unknown, allowPlain = false): T {
   if (payload && typeof payload === "object" && "success" in payload) {
     const wrapped = payload as ApiResponse<T>;
     if (!wrapped.success) {
-      throw new HttpApiError(400, wrapped.message ?? "?붿껌???ㅽ뙣?덉뒿?덈떎.", wrapped.code ?? null);
+      throw new HttpApiError(400, wrapped.message ?? "요청에 실패했습니다.", wrapped.code ?? null);
     }
     return wrapped.data;
   }
@@ -142,15 +150,17 @@ async function parseResponse<T>(
     // 서버가 에러를 내려준 경우 메시지/코드를 최대한 보존해 화면에서 그대로 보여줄 수 있게 합니다.
     if (body && typeof body === "object" && "success" in body) {
       const errorBody = body as ApiResponse<unknown>;
+      // data는 대부분 null이지만 BID_TOO_LOW는 유효 입찰가를 담는다 — 그대로 실어 보낸다.
       throw new HttpApiError(
         response.status,
-        errorBody.message ?? "?붿껌???ㅽ뙣?덉뒿?덈떎.",
+        errorBody.message ?? "요청에 실패했습니다.",
         errorBody.code ?? options?.defaultErrorCode ?? null,
+        errorBody.data,
       );
     }
 
     if (body && typeof body === "object" && "message" in body) {
-      const message = String((body as Record<string, unknown>).message ?? "?붿껌???ㅽ뙣?덉뒿?덈떎.");
+      const message = String((body as Record<string, unknown>).message ?? "요청에 실패했습니다.");
       const codeValue = (body as Record<string, unknown>).code;
       throw new HttpApiError(
         response.status,
@@ -161,7 +171,7 @@ async function parseResponse<T>(
 
     throw new HttpApiError(
       response.status,
-      "?붿껌???ㅽ뙣?덉뒿?덈떎.",
+      "요청에 실패했습니다.",
       options?.defaultErrorCode ?? null,
     );
   }
@@ -169,7 +179,7 @@ async function parseResponse<T>(
   if (!isJson) {
     throw new HttpApiError(
       500,
-      "API ?묐떟 ?뺤떇???щ컮瑜댁? ?딆뒿?덈떎. ?꾨줎?몄쓽 API 二쇱냼 ?먮뒗 媛쒕컻 ?쒕쾭 ?꾨줉???ㅼ젙???뺤씤??二쇱꽭??",
+      "API 응답 형식이 올바르지 않습니다. 프론트의 API 주소 또는 개발 서버 프록시 설정을 확인해 주세요.",
       options?.defaultErrorCode ?? "INVALID_RESPONSE",
     );
   }
@@ -177,7 +187,7 @@ async function parseResponse<T>(
   if (body == null) {
     throw new HttpApiError(
       500,
-      "API ?묐떟??鍮꾩뼱 ?덉뒿?덈떎. 諛깆뿏???쒕쾭媛 ?ㅽ뻾 以묒씤吏 ?뺤씤??二쇱꽭??",
+      "API 응답이 비어 있습니다. 백엔드 서버가 실행 중인지 확인해 주세요.",
       options?.defaultErrorCode ?? "EMPTY_RESPONSE",
     );
   }
@@ -254,7 +264,7 @@ function assertHasTokens(
   payload: Pick<KakaoCallbackResult, "accessToken" | "refreshToken">,
 ): asserts payload is Pick<TokenBundle, "accessToken" | "refreshToken"> {
   if (!payload.accessToken || !payload.refreshToken) {
-    throw new HttpApiError(500, "?좏겙 ?뺣낫媛 鍮꾩뼱 ?덉뒿?덈떎.", "INVALID_TOKEN_BUNDLE");
+    throw new HttpApiError(500, "토큰 정보가 비어 있습니다.", "INVALID_TOKEN_BUNDLE");
   }
 }
 
@@ -381,6 +391,247 @@ async function requestMe(
   return mapMeResponse(payload);
 }
 
+// --- 경매: 한글 라벨 ↔ 백엔드 ENUM 매핑 ---
+const CATEGORY_TO_ENUM: Record<string, string> = {
+  "전자기기": "ELECTRONICS",
+  "패션": "FASHION",
+  "생활/가전": "HOME_APPLIANCE",
+  "수집품": "COLLECTIBLE",
+  "스포츠": "SPORTS",
+  "기타": "ETC",
+};
+const ENUM_TO_CATEGORY: Record<string, string> = Object.fromEntries(
+  Object.entries(CATEGORY_TO_ENUM).map(([label, code]) => [code, label]),
+);
+const CONDITION_TO_ENUM: Record<string, string> = {
+  "미사용": "UNUSED",
+  "거의새것": "LIKE_NEW",
+  "사용감있음": "USED",
+};
+const ENUM_TO_CONDITION: Record<string, string> = Object.fromEntries(
+  Object.entries(CONDITION_TO_ENUM).map(([label, code]) => [code, label]),
+);
+
+function toCategoryEnum(label: string): string {
+  return CATEGORY_TO_ENUM[label] ?? "ETC";
+}
+function toConditionEnum(label: string): string {
+  return CONDITION_TO_ENUM[label] ?? "USED";
+}
+function fromCategoryEnum(code: string | undefined): string {
+  return code ? ENUM_TO_CATEGORY[code] ?? code : "";
+}
+function fromConditionEnum(code: string | undefined): string {
+  return code ? ENUM_TO_CONDITION[code] ?? code : "";
+}
+
+function toServerDateTime(value: string): string {
+  if (!value) return value;
+  return value.length === 16 ? `${value}:00` : value;
+}
+
+function normalizeAuction(payload: Record<string, unknown>): Auction {
+  const images = Array.isArray(payload.images)
+    ? (payload.images as string[])
+    : payload.thumbnailUrl
+      ? [payload.thumbnailUrl as string]
+      : [];
+  const imageIds = Array.isArray(payload.imageIds)
+    ? (payload.imageIds as string[])
+    : undefined;
+  const seller = (payload.seller ?? {}) as Record<string, unknown>;
+  // 공개 예정 시각: startTime이 있으면 사용, 없으면(목록 응답 등) 과거값으로 둬서
+  // 서버가 이미 필터링한 목록을 프론트에서 다시 숨기지 않도록 한다.
+  const startAt = payload.startTime
+    ? String(payload.startTime)
+    : payload.createdAt
+      ? String(payload.createdAt)
+      : new Date(0).toISOString();
+  const sellerId = seller.userId
+    ? String(seller.userId)
+    : payload.sellerId
+      ? String(payload.sellerId)
+      : "";
+  return {
+    id: String(payload.auctionId ?? ""),
+    title: String(payload.title ?? ""),
+    category: fromCategoryEnum(payload.category as string | undefined),
+    description: String(payload.description ?? ""),
+    images,
+    imageIds,
+    condition: fromConditionEnum(payload.condition as string | undefined),
+    startPrice: Number(payload.startPrice ?? payload.currentPrice ?? 0),
+    currentBid: Number(payload.currentPrice ?? 0),
+    bidCount: Number(payload.bidCount ?? 0),
+    buyNowPrice:
+      payload.buyNowPrice === null || payload.buyNowPrice === undefined
+        ? null
+        : Number(payload.buyNowPrice),
+    endAt: String(payload.endTime ?? ""),
+    createdAt: String(payload.createdAt ?? payload.startTime ?? new Date().toISOString()),
+    sellerId,
+    sellerName: seller.nickname ? String(seller.nickname) : "판매자",
+    isSold: String(payload.status ?? "") === "PAID",
+    winnerUserId: payload.winnerUserId ? String(payload.winnerUserId) : null,
+    highestBidderId: null,
+    status: String(payload.status ?? "ACTIVE"),
+    startAt,
+  };
+}
+
+async function resolveImageIds(images: AuctionImageInput[]): Promise<string[]> {
+  // 기존 이미지(id 보유)는 그대로 재사용하고, 신규 파일만 업로드해 imageId를 발급받는다.
+  // 순서를 보존해야 대표 이미지(첫 번째)와 정렬이 유지된다.
+  const imageIds: string[] = [];
+  for (const item of images) {
+    if (item.id) {
+      imageIds.push(item.id);
+      continue;
+    }
+    if (!item.file) {
+      continue;
+    }
+    const form = new FormData();
+    form.append("file", item.file, item.file.name || "upload");
+    const accessToken = getAppState().session.accessToken;
+    const response = await fetch(`${API_BASE_URL}/images/upload`, {
+      method: "POST",
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      body: form,
+    });
+    const uploaded = await parseResponse<{ imageId: string; url: string }>(response);
+    imageIds.push(uploaded.imageId);
+  }
+  return imageIds;
+}
+
+const auction: AuctionRepository = {
+  async listAuctions() {
+    const data = await requestJson<{ content: Record<string, unknown>[] }>(
+      "/auctions?page=0&size=50&sort=endTime,asc",
+      { method: "GET" },
+    );
+    return (data.content ?? []).map(normalizeAuction);
+  },
+
+  async getAuctionById(auctionId) {
+    try {
+      const data = await authFetch<Record<string, unknown>>(`/auctions/${auctionId}`, {
+        method: "GET",
+      });
+      return normalizeAuction(data);
+    } catch {
+      return null;
+    }
+  },
+
+  async listAuctionsBySeller(_sellerId: string) {
+    const data = await authFetch<Record<string, unknown>[]>("/auctions/mine", {
+      method: "GET",
+    });
+    return (data ?? []).map(normalizeAuction);
+  },
+
+  async createAuction(input: CreateAuctionInput, _seller: UserProfile) {
+    const imageIds = await resolveImageIds(input.images);
+    const data = await authFetch<Record<string, unknown>>("/auctions", {
+      method: "POST",
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        category: toCategoryEnum(input.category),
+        condition: toConditionEnum(input.condition),
+        startPrice: input.startPrice,
+        buyNowPrice: input.buyNowPrice,
+        endTime: toServerDateTime(input.endDateTime),
+        imageIds,
+      }),
+    });
+    const created = await this.getAuctionById(String(data.auctionId));
+    return created ?? normalizeAuction(data);
+  },
+
+  async updateAuction(auctionId: string, input: UpdateAuctionInput) {
+    const imageIds = await resolveImageIds(input.images);
+    const data = await authFetch<Record<string, unknown>>(`/auctions/${auctionId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        category: toCategoryEnum(input.category),
+        condition: toConditionEnum(input.condition),
+        startPrice: input.startPrice,
+        buyNowPrice: input.buyNowPrice,
+        endTime: toServerDateTime(input.endDateTime),
+        imageIds,
+      }),
+    });
+    return normalizeAuction(data);
+  },
+
+  async deleteAuction(auctionId: string) {
+    await authFetch<null>(`/auctions/${auctionId}`, { method: "DELETE" });
+  },
+
+  // 입찰 내역(공개): 서버가 닉네임을 마스킹해 내려주므로 그대로 사용한다.
+  async listAuctionBids(auctionId: string) {
+    const data = await requestJson<{
+      content: { maskedNickname: string; price: number; createdAt: string; isHighest: boolean }[];
+    }>(`/auctions/${auctionId}/bids?page=0&size=50`, { method: "GET" });
+    return (data.content ?? []).map((item, index): Bid => ({
+      id: `${auctionId}-${index}-${item.createdAt}`,
+      auctionId,
+      bidderId: "", // 서버가 입찰자 식별자를 노출하지 않음(마스킹)
+      bidderName: item.maskedNickname,
+      amount: item.price,
+      createdAt: item.createdAt,
+      isHighest: item.isHighest,
+    }));
+  },
+
+  // 입찰(인증): POST 후 응답으로 스토어의 경매를 patch한 사본 + 내 입찰 1건을 반환한다.
+  async placeBid(input: PlaceBidInput) {
+    const data = await authFetch<{
+      bidId: string;
+      price: number;
+      currentHighestPrice: number;
+      bidCount: number;
+      createdAt: string;
+    }>(`/auctions/${input.auctionId}/bids`, {
+      method: "POST",
+      body: JSON.stringify({ amount: input.amount }),
+    });
+
+    // 반환 계약({ auction, bid })을 채우기 위해 기존 경매를 기준으로 현재가/입찰수를 갱신
+    const existing = getAppState().auctions.find((item) => item.id === input.auctionId);
+    const baseAuction = existing ?? (await this.getAuctionById(input.auctionId));
+    if (!baseAuction) {
+      throw new HttpApiError(404, "경매를 찾을 수 없습니다.", "AUCTION_NOT_FOUND");
+    }
+    const auction: Auction = {
+      ...baseAuction,
+      currentBid: data.currentHighestPrice,
+      bidCount: data.bidCount,
+      highestBidderId: input.bidderId,
+    };
+    const bid: Bid = {
+      id: data.bidId,
+      auctionId: input.auctionId,
+      bidderId: input.bidderId,
+      bidderName: input.bidderName,
+      amount: data.price,
+      createdAt: data.createdAt,
+      isHighest: true,
+    };
+    return { auction, bid };
+  },
+
+  // 아래 3개는 아직 http 미구현 → index.ts에서 mock으로 합성한다(contracts 충족용 stub).
+  async listBiddingAuctions() { return []; },
+  async listWinningAuctions() { return []; },
+  async markAuctionPaid() { return null; },
+};
+
 const auth: AuthRepository = {
   async getKakaoLoginUrl() {
     const data = await requestJson<{ authorizeUrl: string; state: string }>(
@@ -388,7 +639,7 @@ const auth: AuthRepository = {
       { method: "GET" },
     );
     if (!data || !data.authorizeUrl || !data.state) {
-      throw new HttpApiError(500, "移댁뭅??濡쒓렇??URL??諛쏆? 紐삵뻽?듬땲??", "OAUTH_ERROR");
+      throw new HttpApiError(500, "카카오 로그인 URL을 받지 못했습니다.", "OAUTH_ERROR");
     }
     setOAuthState(data.state);
     // CSRF 방지를 위해 서버가 내려준 state를 저장해 콜백에서 검증합니다.
@@ -497,7 +748,7 @@ const auth: AuthRepository = {
     const me = await requestMe(true);
     const accessToken = getAppState().session.accessToken;
     if (!accessToken) {
-      throw new HttpApiError(401, "?몄쬆??留뚮즺?섏뿀?듬땲??", "UNAUTHORIZED");
+      throw new HttpApiError(401, "인증이 만료되었습니다.", "UNAUTHORIZED");
     }
     applyAuthenticatedSession(me, accessToken);
     return me;
@@ -552,4 +803,5 @@ const auth: AuthRepository = {
 
 export const httpRepository = {
   auth,
+  auction,
 };

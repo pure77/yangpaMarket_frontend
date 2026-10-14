@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { Bell, Clock, Search, User } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuctions, getRemainingMinutes } from "../../hooks/useAuctions";
+import { useAuctionListPolling } from "../../hooks/useAuctionListPolling";
 import { formatPrice, formatTimeLeftMinutes } from "../../utils/format";
 import { BottomNav } from "../common/BottomNav";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
@@ -12,9 +14,18 @@ const categories: Category[] = ["전체", "전자기기", "패션", "생활/가�
 
 export function AuctionHome() {
   const navigate = useNavigate();
-  const { auctions } = useAuctions();
+  const { auctions, refreshAuctions, isAuctionLive } = useAuctions();
   const [activeCategory, setActiveCategory] = useState<Category>("전체");
   const [query, setQuery] = useState("");
+  // 카테고리 드래그 경계(뷰포트) 참조 — motion의 dragConstraints에 사용
+  const categoryViewportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void refreshAuctions();
+  }, []);
+
+  // 홈을 보고 있는 동안 5초마다 목록을 재조회해 상세 화면과 가격 정합성을 맞춘다(접근 B).
+  useAuctionListPolling(refreshAuctions);
 
   const filteredAuctions = useMemo(() => {
     // 카테고리 + 검색어를 동시에 적용해 홈 카드 목록을 만듭니다.
@@ -25,9 +36,9 @@ export function AuctionHome() {
         normalizedQuery.length === 0 ||
         item.title.toLowerCase().includes(normalizedQuery) ||
         item.category.toLowerCase().includes(normalizedQuery);
-      return byCategory && byQuery;
+      return byCategory && byQuery && isAuctionLive(item);
     });
-  }, [activeCategory, auctions, query]);
+  }, [activeCategory, auctions, query, isAuctionLive]);
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -71,20 +82,27 @@ export function AuctionHome() {
           </div>
 
           <div className="pb-4 -mx-4 px-4">
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-              {categories.map((category) => (
-                <button
-                  key={category}
-                  onClick={() => setActiveCategory(category)}
-                  className={`flex-shrink-0 h-9 px-4 rounded-full text-[14px] font-medium transition-colors whitespace-nowrap ${
-                    activeCategory === category
-                      ? "bg-[#FF6F0F] text-white"
-                      : "bg-white text-[#1A1A1A] border border-[#E8E8E8]"
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
+            <div ref={categoryViewportRef} className="overflow-hidden">
+              <motion.div
+                drag="x"
+                dragConstraints={categoryViewportRef}
+                dragElastic={0.08}
+                className="flex gap-2 w-max cursor-grab active:cursor-grabbing"
+              >
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setActiveCategory(category)}
+                    className={`flex-shrink-0 h-9 px-4 rounded-full text-[14px] font-medium transition-colors whitespace-nowrap ${
+                      activeCategory === category
+                        ? "bg-[#FF6F0F] text-white"
+                        : "bg-white text-[#1A1A1A] border border-[#E8E8E8]"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </motion.div>
             </div>
           </div>
 

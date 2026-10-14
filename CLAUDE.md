@@ -119,3 +119,4 @@ src/
 | 날짜 | 변경 내용 | 대상 | 사유 |
 |------|----------|------|------|
 | 2026-05-30 | 초기 구성 | 전체 | - |
+| 2026-06-05 | 경매 CRUD 실제 API 전환(httpRepository.auction), MyAuctions/수정 화면 | repositories/hooks/components | mock→http 경매 연동 |
