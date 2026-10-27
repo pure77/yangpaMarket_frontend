@@ -4,7 +4,8 @@
 
 이 프로젝트는 Vite + React + TypeScript + React Router 기반의 프론트엔드입니다.
 현재 핵심 플로우는 경매 목록/상세, 경매 등록, 인증, 마이페이지, 결제입니다.
-데이터는 인메모리 앱 스토어와 mock repository 레이어로 동작합니다.
+인증·경매 CRUD·입찰은 백엔드 HTTP API와 STOMP(WebSocket)로 연동되어 있고, 입찰 중/낙찰 목록·결제는 아직 mock repository로 동작합니다.
+화면 상태는 인메모리 앱 스토어에 보관합니다.
 
 ## 기술 스택
 
@@ -13,6 +14,7 @@
 - 라우팅: react-router (`createBrowserRouter`, `RouterProvider`)
 - 스타일링: Tailwind CSS v4 + CSS 변수(`src/styles/theme.css`)
 - 상태 관리: `useSyncExternalStore` 기반 커스텀 스토어(`src/app/state/appStore.ts`)
+- 실시간: `@stomp/stompjs` + `sockjs-client` (`src/app/repositories/realtimeClient.ts`)
 - UI 라이브러리: lucide-react, Radix UI 기반 컴포넌트
 
 ## 실행 명령어
@@ -47,6 +49,8 @@ src/
     hooks/
       useAuth.ts
       useAuctions.ts
+      useAuctionRealtime.ts      # 경매 상세 STOMP 구독
+      useAuctionListPolling.ts   # 홈 목록 포그라운드 폴링
       usePayment.ts
     domain/
       types.ts
@@ -54,6 +58,8 @@ src/
       contracts.ts
       mockRepository.ts
       httpRepository.ts
+      realtimeClient.ts          # 싱글톤 STOMP 클라이언트
+      apiError.ts                # 실패 응답(code/data) 파싱
       index.ts
     state/
       appStore.ts
@@ -66,8 +72,10 @@ src/
 
 - 데이터 흐름은 `components -> hooks -> repositories`를 유지합니다.
 - 도메인 타입의 기준은 `src/app/domain/types.ts` 하나로 통일합니다.
-- 현재 활성 모드는 mock 데이터입니다(`src/app/repositories/index.ts`, `ACTIVE_MODE = "mock"`).
-- 실제 API 연동 시 `httpRepository.ts`를 `contracts.ts`에 맞게 구현한 뒤 `ACTIVE_MODE`를 전환합니다.
+- mock/http 전환은 `src/app/repositories/index.ts`의 `repositories` 매핑에서 **메서드 단위**로 합니다. 현재 `auth`와 `auction`(CRUD·목록·입찰·입찰 내역)은 http, `auction.listBiddingAuctions`/`listWinningAuctions`/`markAuctionPaid`와 `payment`는 mock입니다.
+- 새 API 연동 시 `httpRepository.ts`를 `contracts.ts`에 맞게 구현한 뒤 `index.ts` 매핑에서 해당 메서드를 http로 바꿉니다.
+- 실시간 갱신은 `realtimeClient.ts` → `useAuctionRealtime` 경로로만 구독합니다. 컴포넌트에서 STOMP 클라이언트를 직접 만들지 않습니다.
+- 서버 실패 응답의 `code`/`data`(예: `BID_TOO_LOW`의 `minimumBid`)는 `apiError.ts`를 통해 읽습니다.
 - 상태는 `useAppSelector`로 조회하고, 변경은 repository 로직과 `setAppState`를 통해서만 수행합니다.
 
 ## UI/UX 규칙
@@ -97,12 +105,15 @@ src/
 ## 참고 사항
 
 - `vite.config.ts`의 `figma:asset/*` resolver 동작을 유지합니다.
+- 개발 서버는 `/api`, `/ws`(WebSocket 포함)를 `http://localhost:8080`으로 프록시합니다. `define: { global: 'globalThis' }`는 sockjs-client 때문에 필요합니다.
+- 환경변수는 `.env.example`(`VITE_API_BASE_URL`)을 참고합니다.
+- 로그인 화면의 테스트 로그인 패널(`DevLoginPanel`)은 `import.meta.env.DEV`일 때만 노출되며, 백엔드 dev 프로필의 `/api/v1/auth/dev/login`을 호출합니다.
 - React/Tailwind Vite 플러그인은 현재 구성에서 필수입니다.
-- 현재 `package.json`에는 `dev`, `build` 스크립트만 있고 lint/test 스크립트는 없습니다.
+- 현재 `package.json`에는 `dev`, `build` 스크립트만 있고 lint/test 스크립트는 없습니다. `build`는 `vite build`만 실행하므로 타입 체크를 하지 않습니다.
 
 ## 절대 하지 말아야 할 것들
 
 - 내 허락 없이 파일 삭제 금지
 - 모르면 추측하지않고 물어보기
 - 작업 중간에 임의로 다른 방향으로 바꾸지마
-  처음부터 완성본을 만들려고하지말고 AGENTS.md 는 에이전트가 실수할때마다 잔 줄씩 쌇가는 문서이다
+  처음부터 완성본을 만들려고하지말고 AGENTS.md 는 에이전트가 실수할때마다 한 줄씩 쌓아가는 문서이다
