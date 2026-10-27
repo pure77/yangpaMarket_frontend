@@ -103,7 +103,7 @@ export interface Auction {
   winnerUserId: string | null;    // 낙찰자 publicId
   highestBidderId: string | null; // 현재 최고 입찰자
   status: string;                 // ACTIVE / ENDED / CANCELLED
-  startAt: string;                // 공개 시작 시각 (등록 후 5분 유예)
+  startAt: string;                // 공개 시작 시각 (등록 후 1분 유예)
   imageIds?: string[];            // 서버 이미지 publicId 목록 (images와 동일 순서, 수정 시 필요)
 }
 
